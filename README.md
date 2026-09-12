@@ -124,3 +124,47 @@ Example:
                                       │ Conversational │
                                       │     RAG        │
                                       └────────────────┘
+
+<div align="center">
+
+# 🎥 AI Video Meeting Assistant
+
+### Turn hours of meeting recordings into searchable, actionable knowledge.
+
+<p>
+  <b>Transcribe</b> · <b>Summarise</b> · <b>Extract Insights</b> · <b>Chat with Meetings</b>
+</p>
+
+<p>
+  An AI-powered meeting intelligence platform that transforms
+  YouTube videos and audio/video recordings into structured,
+  searchable meeting knowledge.
+</p>
+
+<br>
+
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](#)
+[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](#)
+[![LangChain](https://img.shields.io/badge/LangChain-RAG-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)](#)
+[![Groq](https://img.shields.io/badge/Groq-LLM-F55036?style=for-the-badge)](#)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_DB-5A4FCF?style=for-the-badge)](#)
+
+</div>
+
+---
+
+## 🖥️ Product Preview
+
+<div align="center">
+
+<img src="screenshots/01-dashboard.png" alt="AI Video Assistant Dashboard" width="100%">
+
+<br><br>
+
+<img src="screenshots/02-transcript.png" alt="AI Video Assistant Transcript" width="100%">
+
+<br><br>
+
+<img src="screenshots/03-rag-chat.png" alt="AI Video Assistant RAG Chat" width="100%">
+
+</div>
