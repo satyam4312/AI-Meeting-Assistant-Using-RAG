@@ -1,0 +1,154 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+.conda/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Type checking / linting
+.mypy_cache/
+.pyre/
+.ruff_cache/
+
+# environment variables
+.env
+.env.*
+!.env.example
+
+# API keys / credentials
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# Downloaded YouTube/audio/video files
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.aac
+*.flac
+*.ogg
+*.webm
+*.avi
+*.mov
+*.mkv
+
+# Temporary media directories
+downloads/
+download/
+media/
+audio/
+video/
+temp/
+tmp/
+
+# Generated transcripts
+transcripts/
+transcript/
+*.srt
+*.vtt
+
+# Generated summaries/reports
+reports/
+outputs/
+generated/
+
+# ChromaDB
+chroma_db/
+chroma/
+.chromadb/
+
+# Other vector stores
+vectorstore/
+vector_db/
+embeddings/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+
+# Downloaded model files
+models/
+*.pt
+*.pth
+*.onnx
+*.bin
+*.safetensors
+
+# Hugging Face cache
+.cache/
+huggingface/
+.huggingface/
+
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Streamlit cache
+.streamlit/cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# VS Code settings
+*.code-workspace
+
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+
+# Linux
+*~
+
+# Logs
+*.log
+logs/
+
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Python temporary files
+*.pickle
+*.pkl
+
+
+# Generated PDFs
+*.pdf
+
+# Local configuration
+config.local.*
+settings.local.*
