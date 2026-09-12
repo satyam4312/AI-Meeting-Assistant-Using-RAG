@@ -76,3 +76,51 @@ Example:
 1. Prepare the project report
    Owner: Rahul
    Deadline: Friday
+```
+## Architecture
+
+                    ┌─────────────────────┐
+                    │   YouTube / File    │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │   Audio Processing  │
+                    │   & Extraction      │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │    Transcription    │
+                    │                     │
+                    │ Whisper / Sarvam AI │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │      Transcript     │
+                    └──────────┬──────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+              ▼                ▼                ▼
+       ┌────────────┐   ┌────────────┐   ┌────────────┐
+       │  Summary   │   │  Meeting   │   │    RAG     │
+       │ Generation │   │ Extraction │   │  Pipeline  │
+       └────────────┘   └─────┬──────┘   └─────┬──────┘
+                              │                │
+                       ┌──────┼──────┐         │
+                       ▼      ▼      ▼         ▼
+                    Actions Decisions Questions
+                                               │
+                                               ▼
+                                      ┌────────────────┐
+                                      │ Vector Store   │
+                                      │   ChromaDB     │
+                                      └───────┬────────┘
+                                              │
+                                              ▼
+                                      ┌────────────────┐
+                                      │ Conversational │
+                                      │     RAG        │
+                                      └────────────────┘
