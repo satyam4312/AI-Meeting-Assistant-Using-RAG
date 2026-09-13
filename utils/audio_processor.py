@@ -12,9 +12,14 @@ def download_youtube_audio(url: str) -> str:
 
     ydl_opts = {
         "format": "ba/b",
-
         "outtmpl": output_path,
         "noplaylist": True,
+
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["tv"]
+            }
+        },
 
         "postprocessors": [
             {
@@ -28,8 +33,7 @@ def download_youtube_audio(url: str) -> str:
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download = True)
-
+        info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
         filename = os.path.splitext(filename)[0] + ".wav"
 
