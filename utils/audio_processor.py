@@ -1,151 +1,185 @@
 import os
-import subprocess
 import shutil
+import subprocess
+from pathlib import Path
 
 import yt_dlp
 from pydub import AudioSegment
 
 
-DOWNLOAD_DIR = "downloads"
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+# ============================================================
+# DIRECTORIES
+# ============================================================
+
+DOWNLOAD_DIR = Path("downloads")
+DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+BGUTIL_DIR = Path("/tmp/bgutil-ytdlp-pot-provider")
+BGUTIL_SERVER_DIR = BGUTIL_DIR / "server"
+
+# Pin the provider version so Streamlit does not unexpectedly
+# pull a different server/plugin combination.
+BGUTIL_VERSION = "2.0.0"
 
 
-# ---------------------------------------------------------------------------
-# BgUtils PO Token Provider
-# ---------------------------------------------------------------------------
+# ============================================================
+# BGUTIL PO TOKEN PROVIDER
+# ============================================================
 
-BGUTIL_DIR = "/tmp/bgutil-ytdlp-pot-provider"
-BGUTIL_SERVER_DIR = os.path.join(BGUTIL_DIR, "server")
-BGUTIL_BUILD_DIR = os.path.join(BGUTIL_SERVER_DIR, "build")
+def _command_exists(command: str) -> bool:
+    return shutil.which(command) is not None
 
 
 def setup_po_token_provider() -> bool:
     """
-    Prepare the BgUtils PO Token provider.
+    Prepare bgutil-ytdlp-pot-provider on Streamlit Cloud.
 
-    Returns True if the provider is available.
-    Returns False if setup fails.
+    The provider uses Node.js to generate YouTube proof-of-origin
+    tokens. This helps with YouTube's current 403 / bot protection.
 
-    The provider requires Node.js >= 20.
+    Returns:
+        True if the provider is available.
+        False if it could not be installed.
     """
 
-    # Already compiled during this Streamlit process.
-    generate_script = os.path.join(
-        BGUTIL_BUILD_DIR,
-        "generate_once.js",
+    # Already compiled during this app/container lifetime
+    generate_script = (
+        BGUTIL_SERVER_DIR
+        / "build"
+        / "generate_once.js"
     )
 
-    if os.path.exists(generate_script):
+    if generate_script.exists():
         return True
 
-    node_path = shutil.which("node")
-
-    if not node_path:
-        print(
-            "Node.js is not installed. "
-            "YouTube PO-token support is unavailable."
-        )
+    # Node is required by the provider.
+    if not _command_exists("node"):
+        print("WARNING: Node.js is not available.")
+        print("PO-token provider cannot be initialized.")
         return False
 
-    print("Setting up BgUtils PO Token provider...")
+    # npm is required to build the provider.
+    if not _command_exists("npm"):
+        print("WARNING: npm is not available.")
+        print("PO-token provider cannot be initialized.")
+        return False
 
     try:
+        # Clone only if it doesn't already exist.
+        if not BGUTIL_DIR.exists():
+            print("Installing YouTube PO-token provider...")
 
-        # Remove incomplete previous installation.
-        if os.path.exists(BGUTIL_DIR):
-            shutil.rmtree(BGUTIL_DIR)
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    BGUTIL_VERSION,
+                    "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git",
+                    str(BGUTIL_DIR),
+                ],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+
+        package_json = BGUTIL_SERVER_DIR / "package.json"
+
+        if not package_json.exists():
+            print("WARNING: bgutil server files were not found.")
+            return False
+
+        # Install Node dependencies.
+        print("Installing PO-token provider dependencies...")
 
         subprocess.run(
-            [
-                "git",
-                "clone",
-                "--depth",
-                "1",
-                "https://github.com/Brainicism/"
-                "bgutil-ytdlp-pot-provider.git",
-                BGUTIL_DIR,
-            ],
+            ["npm", "ci", "--no-audit", "--no-fund"],
+            cwd=str(BGUTIL_SERVER_DIR),
             check=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
         )
 
-        subprocess.run(
-            ["npm", "ci"],
-            cwd=BGUTIL_SERVER_DIR,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        # Compile TypeScript -> JavaScript.
+        print("Compiling PO-token provider...")
 
         subprocess.run(
             ["npx", "tsc"],
-            cwd=BGUTIL_SERVER_DIR,
+            cwd=str(BGUTIL_SERVER_DIR),
             check=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
         )
 
-        if not os.path.exists(generate_script):
+        if not generate_script.exists():
             print(
-                "BgUtils compiled, but generate_once.js "
-                "was not found."
+                "WARNING: PO-token provider compilation completed "
+                "but generate_once.js was not found."
             )
             return False
 
-        print("BgUtils PO Token provider ready.")
-
+        print("PO-token provider is ready.")
         return True
 
     except subprocess.CalledProcessError as e:
-
-        print(
-            "Failed to setup BgUtils PO Token provider."
-        )
+        print("PO-token provider setup failed.")
 
         if e.stdout:
             print(e.stdout)
 
-        if e.stderr:
-            print(e.stderr)
-
         return False
 
     except Exception as e:
-
-        print(
-            f"Unexpected PO Token provider error: {e}"
-        )
-
+        print(f"Unexpected PO-token provider setup error: {e}")
         return False
 
 
-# Initialize once when this module is imported.
-PO_TOKEN_PROVIDER_AVAILABLE = setup_po_token_provider()
-
-
-# ---------------------------------------------------------------------------
-# YouTube downloader
-# ---------------------------------------------------------------------------
+# ============================================================
+# YOUTUBE DOWNLOAD
+# ============================================================
 
 def download_youtube_audio(url: str) -> str:
     """
-    Download audio from YouTube and convert it to WAV.
+    Download YouTube audio and convert it to WAV.
 
-    Uses the BgUtils PO Token provider when available.
-    Falls back to normal yt-dlp if the provider cannot be initialized.
+    Uses:
+      - yt-dlp
+      - mweb YouTube client
+      - bgutil PO-token provider when available
     """
 
-    output_template = os.path.join(
-        DOWNLOAD_DIR,
-        "%(id)s.%(ext)s",
+    print("Starting YouTube download...")
+    print(f"URL: {url}")
+
+    provider_available = setup_po_token_provider()
+
+    # Use video ID as filename rather than the title.
+    output_template = str(
+        DOWNLOAD_DIR / "%(id)s.%(ext)s"
     )
 
     ydl_opts = {
+        # Prefer audio.
         "format": "bestaudio/best",
 
         "outtmpl": output_template,
 
+        "noplaylist": True,
+
+        # Retry transient failures.
+        "retries": 5,
+        "fragment_retries": 5,
+
+        # Avoid noisy output in normal Streamlit operation.
+        "quiet": True,
+        "no_warnings": False,
+
+        # FFmpeg converts downloaded audio to WAV.
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -154,55 +188,52 @@ def download_youtube_audio(url: str) -> str:
             }
         ],
 
-        "quiet": False,
-        "no_warnings": False,
-
-        "noplaylist": True,
-
-        "retries": 3,
-        "fragment_retries": 3,
+        # Don't retain the original webm/m4a after conversion.
+        "keepvideo": False,
     }
 
+    # --------------------------------------------------------
+    # YouTube PO token configuration
+    # --------------------------------------------------------
 
-    # -----------------------------------------------------------------------
-    # Enable BgUtils PO token provider
-    # -----------------------------------------------------------------------
-
-    if PO_TOKEN_PROVIDER_AVAILABLE:
-
-        print(
-            "Using BgUtils PO Token provider."
+    if provider_available:
+        generate_script = (
+            BGUTIL_SERVER_DIR
+            / "build"
+            / "generate_once.js"
         )
 
         ydl_opts["extractor_args"] = {
             "youtube": {
+                # Current PO-token configuration works with mweb.
                 "player_client": ["mweb"],
             },
-
             "youtubepot-bgutilscript": {
-                "server_home": BGUTIL_SERVER_DIR,
+                "script_path": str(generate_script),
             },
         }
 
+        # Explicitly tell the provider to use Node.
+        ydl_opts["js_runtimes"] = {
+            "node": None
+        }
+
+        print("Using bgutil PO-token provider.")
+
     else:
+        # Still try normal yt-dlp if the provider cannot initialize.
+        ydl_opts["extractor_args"] = {
+            "youtube": {
+                "player_client": ["mweb"],
+            }
+        }
 
         print(
-            "WARNING: PO Token provider unavailable. "
-            "Trying standard yt-dlp."
+            "PO-token provider unavailable. "
+            "Attempting normal yt-dlp download."
         )
 
-
-    # -----------------------------------------------------------------------
-    # Download
-    # -----------------------------------------------------------------------
-
     try:
-
-        print("========================================")
-        print("YouTube download started")
-        print(f"URL: {url}")
-        print("========================================")
-
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
 
             info = ydl.extract_info(
@@ -210,132 +241,143 @@ def download_youtube_audio(url: str) -> str:
                 download=True,
             )
 
-            if not info:
-                raise RuntimeError(
-                    "yt-dlp returned no video information."
-                )
-
             video_id = info.get("id")
 
             if not video_id:
                 raise RuntimeError(
-                    "yt-dlp did not return a video ID."
+                    "yt-dlp did not return a YouTube video ID."
                 )
 
-        wav_path = os.path.join(
-            DOWNLOAD_DIR,
-            f"{video_id}.wav",
-        )
+        wav_path = DOWNLOAD_DIR / f"{video_id}.wav"
 
-        if not os.path.exists(wav_path):
+        if not wav_path.exists():
 
-            # Fallback search in case FFmpeg produced a
-            # slightly different filename.
-
-            candidates = [
-                os.path.join(
-                    DOWNLOAD_DIR,
-                    filename,
-                )
-                for filename in os.listdir(
-                    DOWNLOAD_DIR
-                )
-                if filename.lower().endswith(".wav")
-            ]
+            # Sometimes yt-dlp/FFmpeg may produce a slightly
+            # different filename. Search for it.
+            candidates = list(
+                DOWNLOAD_DIR.glob(f"{video_id}*.wav")
+            )
 
             if candidates:
-                wav_path = candidates[-1]
+                wav_path = candidates[0]
 
             else:
                 raise FileNotFoundError(
-                    "yt-dlp completed, but no WAV file "
-                    "was created."
+                    "yt-dlp completed, but the WAV file was not found."
                 )
 
-        print(
-            f"YouTube audio successfully downloaded: "
-            f"{wav_path}"
-        )
+        print(f"YouTube audio ready: {wav_path}")
 
-        return wav_path
-
+        return str(wav_path)
 
     except yt_dlp.utils.DownloadError as e:
 
-        print("========================================")
-        print("YT-DLP DOWNLOAD ERROR")
-        print(str(e))
-        print("========================================")
+        error_text = str(e)
 
+        print("=" * 70)
+        print("YT-DLP DOWNLOAD ERROR")
+        print(error_text)
+        print("=" * 70)
+
+        # IMPORTANT:
+        # Do NOT hide the real yt-dlp error behind the old
+        # generic "YouTube refused..." message.
         raise RuntimeError(
             "YouTube download failed.\n\n"
-            f"yt-dlp error:\n{e}"
+            f"{error_text}"
         ) from e
 
+    except Exception as e:
 
-# ---------------------------------------------------------------------------
-# Uploaded file conversion
-# ---------------------------------------------------------------------------
+        print("=" * 70)
+        print("YOUTUBE PROCESSING ERROR")
+        print(repr(e))
+        print("=" * 70)
+
+        raise
+
+
+# ============================================================
+# LOCAL FILE -> WAV
+# ============================================================
 
 def convert_to_wav(input_path: str) -> str:
     """
-    Convert any supported audio/video file
-    to mono 16-kHz WAV.
+    Convert uploaded/local audio or video to mono 16 kHz WAV.
     """
+
+    input_path = str(input_path)
+
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(
+            f"Input file does not exist: {input_path}"
+        )
 
     output_path = (
         os.path.splitext(input_path)[0]
         + "_converted.wav"
     )
 
-    audio = AudioSegment.from_file(
-        input_path
-    )
+    print(f"Converting local file: {input_path}")
 
-    audio = (
-        audio
-        .set_channels(1)
-        .set_frame_rate(16000)
-    )
+    try:
+        audio = AudioSegment.from_file(input_path)
 
-    audio.export(
-        output_path,
-        format="wav",
-    )
+        # Whisper works well with mono 16 kHz audio.
+        audio = (
+            audio
+            .set_channels(1)
+            .set_frame_rate(16000)
+        )
+
+        audio.export(
+            output_path,
+            format="wav",
+        )
+
+    except Exception as e:
+        raise RuntimeError(
+            f"Could not convert the uploaded file to WAV: {e}"
+        ) from e
 
     return output_path
 
 
-# ---------------------------------------------------------------------------
-# Audio chunking
-# ---------------------------------------------------------------------------
+# ============================================================
+# AUDIO CHUNKING
+# ============================================================
 
 def chunk_audio(
     wav_path: str,
     chunk_minutes: int = 10,
 ) -> list:
     """
-    Split WAV audio into fixed-size chunks.
+    Split WAV into manageable chunks.
+
+    Default:
+        10 minutes per chunk
     """
 
-    audio = AudioSegment.from_wav(
-        wav_path
-    )
+    if not os.path.exists(wav_path):
+        raise FileNotFoundError(
+            f"WAV file not found: {wav_path}"
+        )
 
-    chunk_ms = (
-        chunk_minutes
-        * 60
-        * 1000
-    )
+    if chunk_minutes <= 0:
+        raise ValueError(
+            "chunk_minutes must be greater than zero."
+        )
+
+    print("Loading audio for chunking...")
+
+    audio = AudioSegment.from_wav(wav_path)
+
+    chunk_ms = chunk_minutes * 60 * 1000
 
     chunks = []
 
     for i, start in enumerate(
-        range(
-            0,
-            len(audio),
-            chunk_ms,
-        )
+        range(0, len(audio), chunk_ms)
     ):
 
         chunk = audio[
@@ -351,24 +393,32 @@ def chunk_audio(
             format="wav",
         )
 
-        chunks.append(
-            chunk_path
-        )
+        chunks.append(chunk_path)
 
     return chunks
 
 
-# ---------------------------------------------------------------------------
-# Main input processor
-# ---------------------------------------------------------------------------
+# ============================================================
+# MAIN INPUT PROCESSOR
+# ============================================================
 
 def process_input(source: str) -> list:
     """
     Process either:
 
-    1. YouTube URL
-    2. Uploaded local video/audio file
+        1. YouTube URL
+        2. Local/uploaded audio/video file
+
+    Returns:
+        List of WAV chunk paths.
     """
+
+    if not source:
+        raise ValueError(
+            "No input source was provided."
+        )
+
+    source = str(source).strip()
 
     if source.startswith(
         ("http://", "https://")
@@ -379,10 +429,8 @@ def process_input(source: str) -> list:
             "Downloading audio..."
         )
 
-        wav_path = (
-            download_youtube_audio(
-                source
-            )
+        wav_path = download_youtube_audio(
+            source
         )
 
     else:
@@ -399,7 +447,8 @@ def process_input(source: str) -> list:
     print("Chunking audio...")
 
     chunks = chunk_audio(
-        wav_path
+        wav_path,
+        chunk_minutes=10,
     )
 
     print(
@@ -408,4 +457,3 @@ def process_input(source: str) -> list:
     )
 
     return chunks
-
