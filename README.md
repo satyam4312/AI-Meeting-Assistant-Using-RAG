@@ -70,13 +70,6 @@ Identifies:
 - Deadline
 - Relevant context
 
-Example:
-
-```text
-1. Prepare the project report
-   Owner: Rahul
-   Deadline: Friday
-```
 ## Architecture
 
                     ┌─────────────────────┐
