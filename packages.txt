@@ -1,5 +1,0 @@
-ffmpeg
-nodejs
-npm
-git
-

@@ -1,746 +1,284 @@
-import os
-import uuid
-from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
 
 import streamlit as st
-
 from utils.audio_processor import process_input
+from core.transcriber import transcribe_all
+from core.summarizer import summarize, generate_title
+from core.extractor import extract_action_items, extract_key_decisions, extract_questions
+from core.rag_engine import build_rag_chain, ask_question
 
 
-# ============================================================
+# ─────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
-# ============================================================
-
+# ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="AI Meeting Assistant",
-    page_icon="🎙️",
+    page_title="AI Video Assistant",
+    page_icon="🎬",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# STYLE
+# Kept intentionally light — most of the UI now leans on native Streamlit
+# components (tabs, chat_message, status, metrics) instead of custom HTML,
+# which makes it more robust, more accessible, and easier to maintain.
+# ─────────────────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
 
-# ============================================================
-# DIRECTORIES
-# ============================================================
+:root {
+    --bg: #0b0c10;
+    --surface: #14151c;
+    --border: #24252f;
+    --accent: #8b5cf6;
+    --accent-2: #22d3ee;
+    --text-muted: #8a8aa3;
+}
 
-DOWNLOAD_DIR = Path("downloads")
-DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+h1, h2, h3, h4 { font-family: 'Space Grotesk', sans-serif !important; }
 
+.stApp { background: var(--bg); }
 
-# ============================================================
+/* Hero */
+.hero {
+    padding: 0.25rem 0 1rem 0;
+}
+.hero h1 {
+    font-size: 2.1rem;
+    margin: 0;
+    background: linear-gradient(135deg, #ffffff 0%, var(--accent) 60%, var(--accent-2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.hero p {
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+    font-size: 0.95rem;
+}
+
+/* Metric-style summary chips */
+[data-testid="stMetric"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+}
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] { gap: 4px; }
+.stTabs [data-baseweb="tab"] {
+    border-radius: 8px 8px 0 0;
+    padding: 0.5rem 1.1rem;
+}
+
+/* Buttons */
+.stButton > button, .stDownloadButton > button {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] { border-right: 1px solid var(--border); }
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: var(--text-muted);
+}
+.empty-state .emoji { font-size: 3rem; margin-bottom: 0.75rem; }
+</style>
+""", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SESSION STATE
-# ============================================================
-
-if "transcript" not in st.session_state:
-    st.session_state.transcript = ""
-
-if "title" not in st.session_state:
-    st.session_state.title = ""
-
-if "summary" not in st.session_state:
-    st.session_state.summary = ""
-
-if "actions" not in st.session_state:
-    st.session_state.actions = ""
-
-if "decisions" not in st.session_state:
-    st.session_state.decisions = ""
-
-if "questions" not in st.session_state:
-    st.session_state.questions = ""
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-
-# ============================================================
-# WHISPER
-# ============================================================
-
-@st.cache_resource
-def load_whisper_model():
-
-    import whisper
-
-    # "base" is a reasonable Streamlit Cloud starting point.
-    # Change to "small" if your deployment has enough RAM.
-    return whisper.load_model("base")
-
-
-def transcribe_chunks(chunk_paths):
-
-    model = load_whisper_model()
-
-    transcript_parts = []
-
-    total = len(chunk_paths)
-
-    progress = st.progress(0)
-
-    for i, chunk_path in enumerate(chunk_paths):
-
-        st.write(
-            f"Transcribing chunk {i + 1} "
-            f"of {total}..."
-        )
-
-        result = model.transcribe(
-            chunk_path,
-            fp16=False,
-        )
-
-        text = result.get(
-            "text",
-            "",
-        ).strip()
-
-        if text:
-            transcript_parts.append(text)
-
-        progress.progress(
-            (i + 1) / total
-        )
-
-    progress.empty()
-
-    return "\n\n".join(
-        transcript_parts
-    )
-
-
-# ============================================================
-# GROQ / AI
-# ============================================================
-
-def get_groq_model():
-
-    api_key = os.getenv(
-        "GROQ_API_KEY"
-    )
-
-    if not api_key:
-        raise RuntimeError(
-            "GROQ_API_KEY is not configured. "
-            "Add it to Streamlit Cloud Secrets."
-        )
-
-    from langchain_groq import ChatGroq
-
-    return ChatGroq(
-        model="llama-3.3-70b-versatile",
-        temperature=0.2,
-        groq_api_key=api_key,
-    )
-
-
-def ask_ai(prompt: str) -> str:
-
-    llm = get_groq_model()
-
-    response = llm.invoke(prompt)
-
-    return response.content
-
-
-# ============================================================
-# TEXT HELPERS
-# ============================================================
-
-def limit_text(text, max_chars=30000):
-
-    if not text:
-        return ""
-
-    if len(text) <= max_chars:
-        return text
-
-    return (
-        text[:max_chars]
-        + "\n\n[Transcript truncated for AI processing.]"
-    )
-
-
-# ============================================================
-# AI EXTRACTION
-# ============================================================
-
-def generate_meeting_outputs(transcript):
-
-    ai_text = limit_text(
-        transcript,
-        30000,
-    )
-
-    with st.spinner(
-        "Generating meeting insights..."
-    ):
-
-        title = ask_ai(
-            f"""
-Create a short professional title for this meeting.
-
-Transcript:
-{ai_text}
-
-Return only the title.
-"""
-        )
-
-        summary = ask_ai(
-            f"""
-Summarize the following meeting transcript.
-
-Requirements:
-- Give a concise executive summary.
-- Identify the main topics discussed.
-- Mention important conclusions.
-- Do not invent information.
-
-Transcript:
-{ai_text}
-"""
-        )
-
-        actions = ask_ai(
-            f"""
-Extract all action items from this meeting.
-
-For each action item include:
-- Task
-- Person responsible, if explicitly mentioned
-- Deadline, if explicitly mentioned
-
-If no owner or deadline is stated, write "Not specified".
-
-Do not invent names or deadlines.
-
-Transcript:
-{ai_text}
-"""
-        )
-
-        decisions = ask_ai(
-            f"""
-Extract the important decisions made during this meeting.
-
-Use bullet points.
-
-If no clear decisions were made, say:
-"No explicit decisions identified."
-
-Transcript:
-{ai_text}
-"""
-        )
-
-        questions = ask_ai(
-            f"""
-Extract unresolved questions, concerns, or follow-up questions
-from this meeting.
-
-Use bullet points.
-
-If there are none, say:
-"No unresolved questions identified."
-
-Transcript:
-{ai_text}
-"""
-        )
-
-    return (
-        title.strip(),
-        summary.strip(),
-        actions.strip(),
-        decisions.strip(),
-        questions.strip(),
-    )
-
-
-# ============================================================
-# CHAT
-# ============================================================
-
-def answer_question(
-    question,
-    transcript,
-):
-
-    context = limit_text(
-        transcript,
-        40000,
-    )
-
-    prompt = f"""
-You are an AI meeting assistant.
-
-Answer the user's question using ONLY the meeting transcript
-provided below.
-
-Rules:
-- Do not invent information.
-- If the answer is not present, clearly say that it is not stated
-  in the transcript.
-- Be concise but useful.
-- Mention relevant details when available.
-
-MEETING TRANSCRIPT:
-{context}
-
-USER QUESTION:
-{question}
-"""
-
-    return ask_ai(prompt)
-
-
-# ============================================================
-# HEADER
-# ============================================================
-
-st.title(
-    "🎙️ AI Meeting / Video Assistant"
-)
-
-st.caption(
-    "Upload a meeting recording or process a public YouTube video."
-)
-
-
-# ============================================================
-# SIDEBAR
-# ============================================================
-
+# ─────────────────────────────────────────────────────────────────────────────
+for key, default in {
+    "result": None,
+    "chat_history": [],
+    "pipeline_steps": {},
+    "pipeline_done": False,
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+PIPELINE_STEPS = [
+    ("audio", "Processing audio"),
+    ("transcript", "Transcribing"),
+    ("title", "Generating title"),
+    ("summary", "Summarising"),
+    ("extract", "Extracting insights"),
+    ("rag", "Building chat engine"),
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SIDEBAR — inputs live here, kept minimal
+# ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
+    st.markdown("### 🎬 AI Video Assistant")
+    st.caption("Meeting intelligence, end to end.")
+    st.divider()
 
-    st.header("Input")
-
-    input_mode = st.radio(
-        "Choose input type",
-        [
-            "YouTube URL",
-            "Upload video/audio",
-        ],
+    source = st.text_input(
+        "YouTube URL or file path",
+        placeholder="https://youtube.com/watch?v=... or /path/to/file.mp4",
     )
+    language = st.selectbox("Language", ["english", "hinglish"], index=0)
+    run_btn = st.button("⚡ Analyse", use_container_width=True, type="primary")
 
-    youtube_url = None
-    uploaded_file = None
+    if st.session_state.result:
+        st.divider()
+        if st.button("🗂️ New session", use_container_width=True):
+            st.session_state.result = None
+            st.session_state.chat_history = []
+            st.session_state.pipeline_done = False
+            st.rerun()
 
-    if input_mode == "YouTube URL":
+# ─────────────────────────────────────────────────────────────────────────────
+# HEADER
+# ─────────────────────────────────────────────────────────────────────────────
+st.markdown(
+    '<div class="hero"><h1>AI Video Assistant</h1>'
+    '<p>Transcribe · Summarise · Chat with your meetings</p></div>',
+    unsafe_allow_html=True,
+)
 
-        youtube_url = st.text_input(
-            "YouTube URL",
-            placeholder=(
-                "https://www.youtube.com/watch?v=..."
-            ),
-        )
-
+# ─────────────────────────────────────────────────────────────────────────────
+# RUN PIPELINE
+# Uses st.status as a single live, collapsible progress panel instead of a
+# custom sidebar dot-tracker — clearer feedback and built-in error styling.
+# ─────────────────────────────────────────────────────────────────────────────
+if run_btn:
+    if not source.strip():
+        st.error("Please enter a YouTube URL or file path.")
     else:
+        st.session_state.result = None
+        st.session_state.chat_history = []
+        st.session_state.pipeline_done = False
 
-        uploaded_file = st.file_uploader(
-            "Upload meeting video/audio",
-            type=[
-                "mp4",
-                "mov",
-                "mkv",
-                "avi",
-                "webm",
-                "mpeg",
-                "mpg",
-                "m4v",
-                "mp3",
-                "wav",
-                "m4a",
-                "aac",
-                "flac",
-                "ogg",
-            ],
-        )
-
-    process_button = st.button(
-        "🚀 Process Meeting",
-        type="primary",
-        use_container_width=True,
-    )
-
-
-# ============================================================
-# INPUT PROCESSING
-# ============================================================
-
-if process_button:
-
-    source_path = None
-
-    try:
-
-        # ----------------------------------------------------
-        # YOUTUBE
-        # ----------------------------------------------------
-
-        if input_mode == "YouTube URL":
-
-            if not youtube_url:
-                st.warning(
-                    "Please enter a YouTube URL."
-                )
-                st.stop()
-
-            source = youtube_url.strip()
-
-            st.info(
-                "Downloading YouTube audio..."
-            )
-
-        # ----------------------------------------------------
-        # UPLOAD
-        # ----------------------------------------------------
-
-        else:
-
-            if uploaded_file is None:
-                st.warning(
-                    "Please upload a video or audio file."
-                )
-                st.stop()
-
-            extension = Path(
-                uploaded_file.name
-            ).suffix.lower()
-
-            unique_name = (
-                f"{uuid.uuid4().hex}"
-                f"{extension}"
-            )
-
-            source_path = (
-                DOWNLOAD_DIR / unique_name
-            )
-
-            with open(
-                source_path,
-                "wb",
-            ) as f:
-
-                f.write(
-                    uploaded_file.getbuffer()
-                )
-
-            source = str(source_path)
-
-            st.info(
-                "Uploaded file received. "
-                "Converting audio..."
-            )
-
-        # ----------------------------------------------------
-        # AUDIO PROCESSING
-        # ----------------------------------------------------
-
-        with st.spinner(
-            "Preparing audio..."
-        ):
-
-            chunk_paths = process_input(
-                source
-            )
-
-        st.success(
-            f"Audio prepared: "
-            f"{len(chunk_paths)} chunk(s)."
-        )
-
-        # ----------------------------------------------------
-        # TRANSCRIPTION
-        # ----------------------------------------------------
-
-        with st.spinner(
-            "Transcribing with Whisper..."
-        ):
-
-            transcript = transcribe_chunks(
-                chunk_paths
-            )
-
-        if not transcript.strip():
-
-            st.error(
-                "Whisper returned an empty transcript."
-            )
-
-            st.stop()
-
-        st.session_state.transcript = transcript
-
-        # ----------------------------------------------------
-        # AI ANALYSIS
-        # ----------------------------------------------------
-
-        (
-            title,
-            summary,
-            actions,
-            decisions,
-            questions,
-        ) = generate_meeting_outputs(
-            transcript
-        )
-
-        st.session_state.title = title
-        st.session_state.summary = summary
-        st.session_state.actions = actions
-        st.session_state.decisions = decisions
-        st.session_state.questions = questions
-
-        # Reset chat for new meeting.
-        st.session_state.messages = []
-
-        st.success(
-            "Meeting processing completed successfully."
-        )
-
-    except Exception as e:
-
-        error_text = str(e)
-
-        # ----------------------------------------------------
-        # IMPORTANT YOUTUBE ERROR HANDLING
-        # ----------------------------------------------------
-
-        if (
-            "403" in error_text
-            or "Forbidden" in error_text
-            or "YouTube download failed" in error_text
-        ):
-
-            st.error(
-                "YouTube blocked the automated download request."
-            )
-
-            st.warning(
-                "The AI pipeline did not start because "
-                "the audio could not be downloaded."
-            )
-
-            with st.expander(
-                "🔍 Technical YouTube error"
-            ):
-
-                st.code(
-                    error_text,
-                    language="text",
-                )
-
-            st.info(
-                "If this happens for every public YouTube "
-                "video, check the yt-dlp / PO-token provider "
-                "installation in the Streamlit deployment."
-            )
-
-        else:
-
-            st.error(
-                "Could not process the meeting."
-            )
-
-            with st.expander(
-                "Technical error"
-            ):
-
-                st.exception(e)
-
-    finally:
-
-        # ----------------------------------------------------
-        # REMOVE UPLOADED ORIGINAL
-        # ----------------------------------------------------
-
-        if source_path:
-
+        with st.status("Running pipeline…", expanded=True) as status:
             try:
+                st.write("🔊 Processing audio…")
+                chunks = process_input(source)
 
-                if os.path.exists(
-                    source_path
-                ):
+                st.write("📝 Transcribing…")
+                transcript = transcribe_all(chunks, language)
 
-                    os.remove(
-                        source_path
-                    )
+                st.write("🏷️ Generating title…")
+                title = generate_title(transcript)
 
-            except Exception:
-                pass
+                st.write("📋 Summarising…")
+                summary = summarize(transcript)
 
+                st.write("🔍 Extracting action items, decisions & questions…")
+                action_items = extract_action_items(transcript)
+                decisions = extract_key_decisions(transcript)
+                questions = extract_questions(transcript)
 
-# ============================================================
+                st.write("🧠 Building chat engine…")
+                rag_chain = build_rag_chain(transcript)
+
+                st.session_state.result = {
+                    "title": title,
+                    "transcript": transcript,
+                    "summary": summary,
+                    "action_items": action_items,
+                    "key_decisions": decisions,
+                    "open_questions": questions,
+                    "rag_chain": rag_chain,
+                }
+                st.session_state.pipeline_done = True
+                status.update(label="✅ Analysis complete", state="complete", expanded=False)
+
+            except Exception as e:
+                status.update(label="❌ Pipeline failed", state="error", expanded=True)
+                st.exception(e)
+                st.stop()
+
+        st.rerun()
+
+# ─────────────────────────────────────────────────────────────────────────────
 # RESULTS
-# ============================================================
+# ─────────────────────────────────────────────────────────────────────────────
+if st.session_state.result:
+    r = st.session_state.result
 
-if st.session_state.transcript:
+    st.subheader(r["title"])
+
+    def _word_count(text: str) -> int:
+        return len((text or "").split())
+
+    m1, m2, m3, m4 = st.columns(4)
+    def _line_count(text: str) -> int:
+        return len([l for l in (text or "").split("\n") if l.strip()])
+
+    m1.metric("Transcript length", f"{_word_count(r['transcript']):,} words")
+    m2.metric("Action items", _line_count(r["action_items"]))
+    m3.metric("Key decisions", _line_count(r["key_decisions"]))
+    m4.metric("Open questions", _line_count(r["open_questions"]))
 
     st.divider()
 
-    st.header(
-        st.session_state.title
-        or "Meeting Results"
+    tab_summary, tab_actions, tab_decisions, tab_questions, tab_transcript, tab_chat = st.tabs(
+        ["📋 Summary", "✅ Action Items", "🔑 Decisions", "❓ Questions", "📝 Transcript", "💬 Chat"]
     )
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        [
-            "📋 Summary",
-            "✅ Action Items",
-            "🎯 Decisions",
-            "❓ Questions",
-            "📝 Transcript",
-            "💬 Ask AI",
-        ]
-    )
+    with tab_summary:
+        st.markdown(r["summary"])
 
-    # --------------------------------------------------------
-    # SUMMARY
-    # --------------------------------------------------------
+    with tab_actions:
+        st.markdown(r["action_items"])
 
-    with tab1:
+    with tab_decisions:
+        st.markdown(r["key_decisions"])
 
-        st.subheader(
-            "Meeting Summary"
-        )
+    with tab_questions:
+        st.markdown(r["open_questions"])
 
-        st.write(
-            st.session_state.summary
-        )
-
-    # --------------------------------------------------------
-    # ACTION ITEMS
-    # --------------------------------------------------------
-
-    with tab2:
-
-        st.subheader(
-            "Action Items"
-        )
-
-        st.write(
-            st.session_state.actions
-        )
-
-    # --------------------------------------------------------
-    # DECISIONS
-    # --------------------------------------------------------
-
-    with tab3:
-
-        st.subheader(
-            "Decisions"
-        )
-
-        st.write(
-            st.session_state.decisions
-        )
-
-    # --------------------------------------------------------
-    # QUESTIONS
-    # --------------------------------------------------------
-
-    with tab4:
-
-        st.subheader(
-            "Unresolved Questions"
-        )
-
-        st.write(
-            st.session_state.questions
-        )
-
-    # --------------------------------------------------------
-    # TRANSCRIPT
-    # --------------------------------------------------------
-
-    with tab5:
-
-        st.subheader(
-            "Full Transcript"
-        )
-
-        st.text_area(
-            "Transcript",
-            st.session_state.transcript,
-            height=500,
-        )
-
+    with tab_transcript:
+        st.text_area("Full transcript", r["transcript"], height=400, label_visibility="collapsed")
         st.download_button(
-            "⬇️ Download Transcript",
-            data=st.session_state.transcript,
-            file_name="meeting_transcript.txt",
+            "⬇️ Download transcript (.txt)",
+            data=r["transcript"],
+            file_name="transcript.txt",
             mime="text/plain",
-            use_container_width=True,
         )
 
-    # --------------------------------------------------------
-    # AI CHAT
-    # --------------------------------------------------------
+    with tab_chat:
+        st.caption("Ask anything about this meeting — grounded in the transcript.")
 
-    with tab6:
+        for msg in st.session_state.chat_history:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
 
-        st.subheader(
-            "Ask questions about the meeting"
-        )
-
-        for message in st.session_state.messages:
-
-            with st.chat_message(
-                message["role"]
-            ):
-
-                st.markdown(
-                    message["content"]
-                )
-
-        user_question = st.chat_input(
-            "Ask something about the meeting..."
-        )
-
-        if user_question:
-
-            st.session_state.messages.append(
-                {
-                    "role": "user",
-                    "content": user_question,
-                }
-            )
-
+        if prompt := st.chat_input("What were the main decisions made?"):
+            st.session_state.chat_history.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
+                st.markdown(prompt)
 
-                st.markdown(
-                    user_question
-                )
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking…"):
+                    answer = ask_question(r["rag_chain"], prompt)
+                st.markdown(answer)
+            st.session_state.chat_history.append({"role": "assistant", "content": answer})
 
-            try:
+        if st.session_state.chat_history:
+            if st.button("🗑️ Clear chat"):
+                st.session_state.chat_history = []
+                st.rerun()
 
-                with st.chat_message(
-                    "assistant"
-                ):
+else:
+    st.markdown("""
+    <div class="empty-state">
+        <div class="emoji">🎬</div>
+        <h3>Ready to analyse</h3>
+        <p>Paste a YouTube URL or local file path in the sidebar, choose your language,
+        and hit <strong>Analyse</strong> to get started.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-                    with st.spinner(
-                        "Thinking..."
-                    ):
-
-                        answer = answer_question(
-                            user_question,
-                            st.session_state.transcript,
-                        )
-
-                    st.markdown(
-                        answer
-                    )
-
-                st.session_state.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": answer,
-                    }
-                )
-
-            except Exception as e:
-
-                st.error(
-                    f"AI chat failed: {e}"
-                )
