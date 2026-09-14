@@ -1,764 +1,382 @@
 import os
 from pathlib import Path
-
 import streamlit as st
+
 from dotenv import load_dotenv
+load_dotenv(override = True)
 
-
-# ============================================================
-# LOAD ENVIRONMENT VARIABLES FIRST
-# ============================================================
-
-load_dotenv(override=True)
-
-
-# ============================================================
-# PROJECT IMPORTS
-# ============================================================
-
-from utils.audio_processor import (
-    process_input,
-    YouTubeDownloadError,
-)
-
+from utils.audio_processor import process_input, YouTubeDownloadError
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_all
 from core.rag_engine import build_rag_chain, ask_question
 
-
-# ============================================================
-# STREAMLIT CONFIGURATION
-# ============================================================
-
 st.set_page_config(
     page_title="AI Video Meeting Assistant",
     page_icon="🎥",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
-
-
-# ============================================================
-# SESSION STATE
-# ============================================================
-
-if "processed" not in st.session_state:
-    st.session_state.processed = False
-
-if "transcript" not in st.session_state:
-    st.session_state.transcript = ""
-
-if "title" not in st.session_state:
-    st.session_state.title = ""
-
-if "summary" not in st.session_state:
-    st.session_state.summary = ""
-
-if "actions" not in st.session_state:
-    st.session_state.actions = []
-
-if "decisions" not in st.session_state:
-    st.session_state.decisions = []
-
-if "questions" not in st.session_state:
-    st.session_state.questions = []
-
-if "rag_chain" not in st.session_state:
-    st.session_state.rag_chain = None
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-
-# ============================================================
-# PAGE HEADER
-# ============================================================
-
-st.title("🎥 AI Video Meeting Assistant")
 
 st.markdown(
     """
-    **Turn meeting recordings into searchable, actionable knowledge.**
-
-    🎙️ Transcribe &nbsp;&nbsp;→&nbsp;&nbsp;
-    🧠 Summarize &nbsp;&nbsp;→&nbsp;&nbsp;
-    ✅ Extract Actions &nbsp;&nbsp;→&nbsp;&nbsp;
-    💬 Ask Questions
-    """
+    <style>
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+            max-width: 1100px;
+        }
+        .hero {
+            background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%);
+            border-radius: 18px;
+            padding: 2.2rem 2.5rem;
+            margin-bottom: 1.8rem;
+            color: white;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.25);
+        }
+        .hero h1 { margin: 0 0 0.4rem 0; font-size: 2.1rem; font-weight: 800; color: white; }
+        .hero p { margin: 0; font-size: 1.02rem; opacity: 0.92; }
+        .pipeline { margin-top: 1.1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.92rem; }
+        .pipeline span { background: rgba(255, 255, 255, 0.18); padding: 0.3rem 0.85rem; border-radius: 999px; font-weight: 600; }
+        .section-card {
+            background: var(--background-color, #ffffff);
+            border: 1px solid rgba(120, 120, 120, 0.15);
+            border-radius: 16px;
+            padding: 1.6rem 1.8rem;
+            margin-bottom: 1.4rem;
+        }
+        .section-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+        div[data-testid="stMetric"] {
+            background: rgba(99, 102, 241, 0.06);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: 14px;
+            padding: 1rem 1.1rem;
+        }
+        div.stButton > button[kind="primary"] {
+            border-radius: 12px;
+            font-weight: 700;
+            padding: 0.7rem 1.2rem;
+            font-size: 1.02rem;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+        }
+        .item-card {
+            border: 1px solid rgba(120, 120, 120, 0.15);
+            border-radius: 12px;
+            padding: 0.95rem 1.2rem;
+            margin-bottom: 0.8rem;
+            background: rgba(120, 120, 120, 0.03);
+        }
+        .item-card h4 { margin: 0 0 0.4rem 0; font-size: 1.02rem; }
+        .item-meta { display: flex; gap: 1.5rem; font-size: 0.88rem; opacity: 0.85; margin-top: 0.3rem; }
+        .badge { display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.6rem; border-radius: 999px; }
+        .badge-decision { background: rgba(16, 185, 129, 0.15); color: #059669; }
+        .badge-question { background: rgba(245, 158, 11, 0.15); color: #B45309; }
+        button[data-baseweb="tab"] { font-weight: 600; }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
-st.divider()
-
-
-# ============================================================
-# INPUT SECTION
-# ============================================================
-
-st.subheader("🎬 Meeting Input")
+defaults = {
+    "processed": False,
+    "transcript": "",
+    "title": "",
+    "summary": "",
+    "actions": [],
+    "decisions": [],
+    "questions": [],
+    "rag_chain": None,
+    "chat_history": [],
+}
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 st.markdown(
     """
-    Provide a **YouTube URL** or upload an **audio/video file**.
-
-    > ⚠️ YouTube may restrict automated access to some videos.
-    > If a YouTube URL cannot be downloaded, upload the audio/video
-    > file instead.
-    """
+    <div class="hero">
+        <h1>🎥 AI Video Meeting Assistant</h1>
+        <p>Turn meeting recordings into searchable, actionable knowledge.</p>
+        <div class="pipeline">
+            <span>🎙️ Transcribe</span>
+            <span>🧠 Summarize</span>
+            <span>✅ Extract Actions</span>
+            <span>💬 Ask Questions</span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
-
-youtube_url = st.text_input(
-    "YouTube URL",
-    placeholder="https://www.youtube.com/watch?v=...",
+st.markdown('<div class="section-card">', unsafe_allow_html=True)
+st.markdown('<div class="section-title">🎬 Meeting Input</div>', unsafe_allow_html=True)
+st.caption("Provide a **YouTube URL** or upload an **audio/video file**.")
+st.info(
+    "⚠️ YouTube may restrict automated access to some videos. "
+    "If a YouTube URL cannot be downloaded, upload the audio/video file instead.",
+    icon="⚠️",
 )
 
+input_col1, input_col2 = st.columns(2, gap="large")
+with input_col1:
+    st.markdown("**🔗 YouTube URL**")
+    youtube_url = st.text_input(
+        "YouTube URL", placeholder="https://www.youtube.com/watch?v=...", label_visibility="collapsed"
+    )
+with input_col2:
+    st.markdown("**📁 Upload audio/video file**")
+    uploaded_file = st.file_uploader(
+        "Upload audio/video file",
+        type=["mp4", "mov", "mkv", "avi", "webm", "mp3", "wav", "m4a", "aac", "flac", "ogg"],
+        label_visibility="collapsed",
+    )
 
-st.markdown("### OR")
-
-
-uploaded_file = st.file_uploader(
-    "Upload audio/video file",
-    type=[
-        "mp4",
-        "mov",
-        "mkv",
-        "avi",
-        "webm",
-        "mp3",
-        "wav",
-        "m4a",
-        "aac",
-        "flac",
-        "ogg",
-    ],
-)
-
-
-# ============================================================
-# PROCESSING BUTTON
-# ============================================================
-
-process_button = st.button(
-    "🚀 Process Meeting",
-    type="primary",
-    use_container_width=True,
-)
-
-
-# ============================================================
-# DETERMINE INPUT
-# ============================================================
+st.write("")
+process_button = st.button("🚀 Process Meeting", type="primary", use_container_width=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 if process_button:
-
     source = None
 
-    # --------------------------------------------------------
-    # YouTube URL
-    # --------------------------------------------------------
-
     if youtube_url.strip():
-
         source = youtube_url.strip()
 
-    # --------------------------------------------------------
-    # Uploaded file
-    # --------------------------------------------------------
-
     elif uploaded_file is not None:
-
         upload_dir = Path("uploads")
-        upload_dir.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        uploaded_path = (
-            upload_dir / uploaded_file.name
-        )
-
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        uploaded_path = upload_dir / uploaded_file.name
         try:
-
-            with open(
-                uploaded_path,
-                "wb",
-            ) as f:
-
-                f.write(
-                    uploaded_file.getbuffer()
-                )
-
+            with open(uploaded_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
             source = str(uploaded_path)
-
         except Exception as e:
-
-            st.error(
-                "❌ Could not save the uploaded file."
-            )
-
+            st.error("❌ Could not save the uploaded file.")
             st.exception(e)
-
             st.stop()
 
-    # --------------------------------------------------------
-    # No input
-    # --------------------------------------------------------
-
     else:
-
-        st.warning(
-            "Please enter a YouTube URL or upload "
-            "an audio/video file."
-        )
-
+        st.warning("Please enter a YouTube URL or upload an audio/video file.")
         st.stop()
 
-
-    # ========================================================
-    # STEP 1 — AUDIO PROCESSING
-    # ========================================================
-
     try:
-
-        with st.status(
-            "🎧 Processing audio/video...",
-            expanded=True,
-        ) as status:
-
-            st.write(
-                "Extracting and preparing audio..."
-            )
-
+        with st.status("🎧 Processing audio/video...", expanded=True) as status:
+            st.write("Extracting and preparing audio...")
             chunks = process_input(source)
-
-            st.write(
-                f"Created **{len(chunks)} audio chunk(s)**."
-            )
-
-            status.update(
-                label="✅ Audio processing complete",
-                state="complete",
-            )
-
+            st.write(f"Created **{len(chunks)} audio chunk(s)**.")
+            status.update(label="✅ Audio processing complete", state="complete")
     except YouTubeDownloadError:
-
-        st.error(
-            "🚫 YouTube is currently preventing "
-            "automated access to this video."
-        )
-
+        st.error("🚫 YouTube is currently preventing automated access to this video.")
         st.info(
-            """
-            **Please upload the audio/video file instead.**
-
-            Download the video or audio from YouTube using
-            a method available to you, then upload the file
-            in the section above.
-
-            The rest of the AI Meeting Assistant pipeline
-            will work normally.
-            """
+            "**Please upload the audio/video file instead.**\n\n"
+            "Download the video or audio from YouTube using a method available to you, "
+            "then upload the file in the section above.\n\n"
+            "The rest of the AI Meeting Assistant pipeline will work normally."
         )
-
         st.stop()
-
     except Exception as e:
-
-        st.error(
-            "❌ An unexpected error occurred while "
-            "processing the audio/video."
-        )
-
+        st.error("❌ An unexpected error occurred while processing the audio/video.")
         st.exception(e)
-
         st.stop()
-
-
-    # ========================================================
-    # STEP 2 — TRANSCRIPTION
-    # ========================================================
 
     try:
-
-        with st.status(
-            "🎙️ Transcribing meeting...",
-            expanded=True,
-        ) as status:
-
-            st.write(
-                "Running speech-to-text..."
-            )
-
+        with st.status("🎙️ Transcribing meeting...", expanded=True) as status:
+            st.write("Running speech-to-text...")
             transcript = transcribe_all(chunks)
-
             if not transcript:
-                st.error(
-                    "No transcript was generated."
-                )
-
+                st.error("No transcript was generated.")
                 st.stop()
-
-            st.write(
-                f"Transcript generated: "
-                f"**{len(transcript.split()):,} words**"
-            )
-
-            status.update(
-                label="✅ Transcription complete",
-                state="complete",
-            )
-
+            st.write(f"Transcript generated: **{len(transcript.split()):,} words**")
+            status.update(label="✅ Transcription complete", state="complete")
     except Exception as e:
-
-        st.error(
-            "❌ Transcription failed."
-        )
-
+        st.error("❌ Transcription failed.")
         st.exception(e)
-
         st.stop()
-
-
-    # ========================================================
-    # STEP 3 — TITLE + SUMMARY
-    # ========================================================
 
     try:
-
-        with st.status(
-            "🧠 Generating meeting summary...",
-            expanded=True,
-        ) as status:
-
-            title = generate_title(
-                transcript
-            )
-
-            summary = summarize(
-                transcript
-            )
-
-            status.update(
-                label="✅ Summary generated",
-                state="complete",
-            )
-
+        with st.status("🧠 Generating meeting summary...", expanded=True) as status:
+            title = generate_title(transcript)
+            summary = summarize(transcript)
+            status.update(label="✅ Summary generated", state="complete")
     except Exception as e:
-
-        st.error(
-            "❌ Summary generation failed."
-        )
-
+        st.error("❌ Summary generation failed.")
         st.exception(e)
-
         st.stop()
-
-
-    # ========================================================
-    # STEP 4 — ACTIONS / DECISIONS / QUESTIONS
-    # ========================================================
 
     try:
-
-        with st.status(
-            "📋 Extracting meeting information...",
-            expanded=True,
-        ) as status:
-
-            extracted = extract_all(
-                transcript
-            )
-
-            # Support dictionary returned by extractor.py
-            actions = extracted.get(
-                "actions",
-                []
-            )
-
-            decisions = extracted.get(
-                "decisions",
-                []
-            )
-
-            questions = extracted.get(
-                "questions",
-                []
-            )
-
-            status.update(
-                label="✅ Meeting information extracted",
-                state="complete",
-            )
-
+        with st.status("📋 Extracting meeting information...", expanded=True) as status:
+            extracted = extract_all(transcript)
+            actions = extracted.get("actions", [])
+            decisions = extracted.get("decisions", [])
+            questions = extracted.get("questions", [])
+            status.update(label="✅ Meeting information extracted", state="complete")
     except Exception as e:
-
-        st.error(
-            "❌ Information extraction failed."
-        )
-
+        st.error("❌ Information extraction failed.")
         st.exception(e)
-
         st.stop()
-
-
-    # ========================================================
-    # STEP 5 — BUILD RAG
-    # ========================================================
 
     try:
-
-        with st.status(
-            "🔎 Building meeting knowledge base...",
-            expanded=True,
-        ) as status:
-
-            rag_chain = build_rag_chain(
-                transcript
-            )
-
-            status.update(
-                label="✅ RAG knowledge base ready",
-                state="complete",
-            )
-
+        with st.status("🔎 Building meeting knowledge base...", expanded=True) as status:
+            rag_chain = build_rag_chain(transcript)
+            status.update(label="✅ RAG knowledge base ready", state="complete")
     except Exception as e:
-
-        st.error(
-            "❌ RAG initialization failed."
-        )
-
+        st.error("❌ RAG initialization failed.")
         st.exception(e)
-
         st.stop()
-
-
-    # ========================================================
-    # SAVE RESULTS TO SESSION STATE
-    # ========================================================
 
     st.session_state.title = title
     st.session_state.transcript = transcript
     st.session_state.summary = summary
-
     st.session_state.actions = actions
     st.session_state.decisions = decisions
     st.session_state.questions = questions
-
     st.session_state.rag_chain = rag_chain
-
     st.session_state.chat_history = []
-
     st.session_state.processed = True
 
-    st.success(
-        "🎉 Meeting processed successfully!"
-    )
-
+    st.success("🎉 Meeting processed successfully!")
+    st.balloons()
     st.rerun()
 
-
-# ============================================================
-# DISPLAY RESULTS
-# ============================================================
-
 if st.session_state.processed:
-
-    # --------------------------------------------------------
-    # TITLE
-    # --------------------------------------------------------
-
-    st.header(
-        st.session_state.title
+    st.markdown(
+        f"""
+        <div class="section-card" style="text-align:center;">
+            <div style="font-size:0.85rem; font-weight:700; letter-spacing:0.05em;
+                        text-transform:uppercase; opacity:0.55; margin-bottom:0.3rem;">
+                Meeting Report
+            </div>
+            <div style="font-size:1.7rem; font-weight:800;">
+                {st.session_state.title}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-
-    # --------------------------------------------------------
-    # METRICS
-    # --------------------------------------------------------
-
-    transcript_words = len(
-        st.session_state.transcript.split()
-    )
-
+    transcript_words = len(st.session_state.transcript.split())
     col1, col2, col3, col4 = st.columns(4)
-
     with col1:
-        st.metric(
-            "Transcript Length",
-            f"{transcript_words:,} words",
-        )
-
+        st.metric("📄 Transcript Length", f"{transcript_words:,} words")
     with col2:
-        st.metric(
-            "Action Items",
-            len(st.session_state.actions),
-        )
-
+        st.metric("✅ Action Items", len(st.session_state.actions))
     with col3:
-        st.metric(
-            "Key Decisions",
-            len(st.session_state.decisions),
-        )
-
+        st.metric("🎯 Key Decisions", len(st.session_state.decisions))
     with col4:
-        st.metric(
-            "Open Questions",
-            len(st.session_state.questions),
-        )
+        st.metric("❓ Open Questions", len(st.session_state.questions))
 
+    st.write("")
 
-    st.divider()
-
-
-    # ========================================================
-    # TABS
-    # ========================================================
-
-    (
-        summary_tab,
-        actions_tab,
-        decisions_tab,
-        questions_tab,
-        transcript_tab,
-        chat_tab,
-    ) = st.tabs(
-        [
-            "📝 Summary",
-            "✅ Action Items",
-            "🎯 Decisions",
-            "❓ Questions",
-            "📄 Transcript",
-            "💬 Chat",
-        ]
+    summary_tab, actions_tab, decisions_tab, questions_tab, transcript_tab, chat_tab = st.tabs(
+        ["📝 Summary", "✅ Action Items", "🎯 Decisions", "❓ Questions", "📄 Transcript", "💬 Chat"]
     )
-
-
-    # ========================================================
-    # SUMMARY TAB
-    # ========================================================
 
     with summary_tab:
-
-        st.subheader("Meeting Summary")
-
-        st.markdown(
-            st.session_state.summary
-        )
-
-
-    # ========================================================
-    # ACTION ITEMS TAB
-    # ========================================================
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📝 Meeting Summary</div>', unsafe_allow_html=True)
+        st.markdown(st.session_state.summary)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with actions_tab:
-
-        st.subheader("Action Items")
-
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">✅ Action Items</div>', unsafe_allow_html=True)
         actions = st.session_state.actions
-
         if not actions:
-
-            st.info(
-                "No action items were identified."
-            )
-
+            st.info("No action items were identified.")
         else:
-
-            for i, action in enumerate(
-                actions,
-                start=1,
-            ):
-
+            for i, action in enumerate(actions, start=1):
                 if isinstance(action, dict):
-
+                    task = action.get("task", action.get("action", "Action"))
+                    owner = action.get("owner", "Not specified")
+                    deadline = action.get("deadline", "Not specified")
                     st.markdown(
-                        f"### {i}. "
-                        f"{action.get('task', action.get('action', 'Action'))}"
+                        f"""
+                        <div class="item-card">
+                            <h4>{i}. {task}</h4>
+                            <div class="item-meta">
+                                <span>👤 <b>Owner:</b> {owner}</span>
+                                <span>📅 <b>Deadline:</b> {deadline}</span>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
                     )
-
-                    owner = action.get(
-                        "owner",
-                        "Not specified",
-                    )
-
-                    deadline = action.get(
-                        "deadline",
-                        "Not specified",
-                    )
-
-                    st.write(
-                        f"**Owner:** {owner}"
-                    )
-
-                    st.write(
-                        f"**Deadline:** {deadline}"
-                    )
-
                 else:
-
-                    st.markdown(
-                        f"### {i}. {action}"
-                    )
-
-                st.divider()
-
-
-    # ========================================================
-    # DECISIONS TAB
-    # ========================================================
+                    st.markdown(f'<div class="item-card"><h4>{i}. {action}</h4></div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with decisions_tab:
-
-        st.subheader("Key Decisions")
-
-        decisions = (
-            st.session_state.decisions
-        )
-
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">🎯 Key Decisions</div>', unsafe_allow_html=True)
+        decisions = st.session_state.decisions
         if not decisions:
-
-            st.info(
-                "No key decisions were identified."
-            )
-
+            st.info("No key decisions were identified.")
         else:
-
-            for i, decision in enumerate(
-                decisions,
-                start=1,
-            ):
-
+            for i, decision in enumerate(decisions, start=1):
                 st.markdown(
-                    f"### {i}. {decision}"
+                    f"""
+                    <div class="item-card">
+                        <span class="badge badge-decision">DECISION {i}</span>
+                        <p style="margin-top:0.5rem; margin-bottom:0;">{decision}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
-
-
-    # ========================================================
-    # QUESTIONS TAB
-    # ========================================================
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with questions_tab:
-
-        st.subheader(
-            "Open Questions & Follow-ups"
-        )
-
-        questions = (
-            st.session_state.questions
-        )
-
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">❓ Open Questions & Follow-ups</div>', unsafe_allow_html=True)
+        questions = st.session_state.questions
         if not questions:
-
-            st.info(
-                "No unresolved questions were identified."
-            )
-
+            st.info("No unresolved questions were identified.")
         else:
-
-            for i, question in enumerate(
-                questions,
-                start=1,
-            ):
-
+            for i, question in enumerate(questions, start=1):
                 st.markdown(
-                    f"**{i}.** {question}"
+                    f"""
+                    <div class="item-card">
+                        <span class="badge badge-question">Q{i}</span>
+                        <p style="margin-top:0.5rem; margin-bottom:0;">{question}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
-
-
-    # ========================================================
-    # TRANSCRIPT TAB
-    # ========================================================
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with transcript_tab:
-
-        st.subheader(
-            "Full Meeting Transcript"
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📄 Full Meeting Transcript</div>', unsafe_allow_html=True)
+        st.download_button(
+            "⬇️ Download transcript (.txt)",
+            data=st.session_state.transcript,
+            file_name=f"{st.session_state.title or 'transcript'}.txt",
+            mime="text/plain",
         )
-
-        st.text_area(
-            "Transcript",
-            value=st.session_state.transcript,
-            height=600,
-            label_visibility="collapsed",
-        )
-
-
-    # ========================================================
-    # CHAT / RAG TAB
-    # ========================================================
+        st.text_area("Transcript", value=st.session_state.transcript, height=600, label_visibility="collapsed")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with chat_tab:
-
-        st.subheader(
-            "💬 Chat with your meeting"
-        )
-
-        st.caption(
-            "Ask questions about the meeting. "
-            "Answers are generated from the meeting transcript."
-        )
-
-
-        # ----------------------------------------------------
-        # Display previous chat
-        # ----------------------------------------------------
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">💬 Chat with your meeting</div>', unsafe_allow_html=True)
+        st.caption("Ask questions about the meeting. Answers are generated from the meeting transcript.")
 
         for message in st.session_state.chat_history:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-            with st.chat_message(
-                message["role"]
-            ):
-
-                st.markdown(
-                    message["content"]
-                )
-
-
-        # ----------------------------------------------------
-        # Chat input
-        # ----------------------------------------------------
-
-        question = st.chat_input(
-            "Ask something about the meeting..."
-        )
-
-
+        question = st.chat_input("Ask something about the meeting...")
         if question:
-
-            # ------------------------------------------------
-            # User message
-            # ------------------------------------------------
-
-            st.session_state.chat_history.append(
-                {
-                    "role": "user",
-                    "content": question,
-                }
-            )
-
+            st.session_state.chat_history.append({"role": "user", "content": question})
             with st.chat_message("user"):
-
                 st.markdown(question)
-
-
-            # ------------------------------------------------
-            # Generate answer
-            # ------------------------------------------------
 
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
                     try:
-                        answer = ask_question(
-                            st.session_state.rag_chain,
-                            question,
-                        )
+                        answer = ask_question(st.session_state.rag_chain, question)
                         st.markdown(answer)
-                        st.session_state.chat_history.append(
-                            {
-                                "role": "assistant",
-                                "content": answer,
-                            }
-                        )
+                        st.session_state.chat_history.append({"role": "assistant", "content": answer})
                     except Exception as e:
                         st.error("❌ Unable to answer the question.")
                         st.exception(e)
+
+        st.markdown("</div>", unsafe_allow_html=True)
