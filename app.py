@@ -111,11 +111,6 @@ st.markdown(
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title">🎬 Meeting Input</div>', unsafe_allow_html=True)
 st.caption("Provide a **YouTube URL** or upload an **audio/video file**.")
-st.info(
-    "⚠️ YouTube may restrict automated access to some videos. "
-    "If a YouTube URL cannot be downloaded, upload the audio/video file instead.",
-    icon="⚠️",
-)
 
 input_col1, input_col2 = st.columns(2, gap="large")
 with input_col1:
