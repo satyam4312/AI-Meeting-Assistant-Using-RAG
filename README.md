@@ -4,7 +4,7 @@
 
 An AI-powered meeting intelligence application that processes YouTube videos and uploaded audio/video files, transcribes speech, generates structured meeting insights, and lets users ask context-aware questions about the recording through Retrieval-Augmented Generation (RAG).
 
-## 🚀 Overview
+## Overview
 
 Meetings and recorded discussions often contain decisions, commitments, deadlines, and unresolved questions that are difficult to find by replaying an entire recording. This project automates the process of converting recordings into structured notes and a conversational knowledge source.
 
@@ -13,12 +13,15 @@ Provide a YouTube URL or upload an audio/video file. The application prepares th
 ## Application Screenshots
 
 ### Home Page
-![App Home Page]([screenshots/Screenshot%202026-09-13%20025702.png])
+![App Home Page](screenshots/apphome.png)
 
-### Prediction Results
-![Prediction Results](screenshots/prediction.png)
+### Chat
+![Chat](screenshots/chat.png)
 
-## ✨ Features
+### Transcript
+![Transcript](screenshots/transcript.png)
+
+## Features
 
 ### 🎬 Multiple input sources
 
@@ -57,7 +60,7 @@ The transcription workflow depends on the language selected and the configuratio
 
 Explore the meeting output through separate views for the summary, action items, decisions, questions, transcript, and chat-based Q&A.
 
-## 🔄 Application workflow
+## Application workflow
 
 1. **Input:** provide a YouTube URL or upload an audio/video file.
 2. **Audio preparation:** download/extract audio where possible, convert it to a compatible WAV format, and split long recordings into chunks.
@@ -67,7 +70,7 @@ Explore the meeting output through separate views for the summary, action items,
 6. **Question answering:** retrieve relevant transcript chunks and pass the context to the language model.
 7. **Results:** review the outputs and ask follow-up questions from the Streamlit interface.
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -93,7 +96,7 @@ flowchart TD
     P --> Q
 ```
 
-## 🧰 Technology stack
+## Tech-stack used
 
 | Area | Technologies |
 | --- | --- |
@@ -107,7 +110,7 @@ flowchart TD
 | Configuration | `python-dotenv`, Streamlit secrets |
 | Deployment | Streamlit Community Cloud |
 
-## 🛠️ Getting started
+## Getting started
 
 ### Prerequisites
 
@@ -165,7 +168,7 @@ SARVAM_API_KEY=your_sarvam_api_key
 
 Replace the example values with your own keys. **Never commit `.env` or real API keys to GitHub.** The application code must load these values using its configured environment-variable or Streamlit-secrets mechanism.
 
-## ▶️ Run the application
+## Run the application
 
 From the activated virtual environment and repository root, run:
 
@@ -177,7 +180,7 @@ Open the local URL printed in the terminal, usually `http://localhost:8501`.
 
 For a first end-to-end test, upload a short audio/video file, check the transcript and extracted insights, then ask a question in the chat tab and verify that the answer is supported by the transcript.
 
-## ☁️ Deploy to Streamlit Community Cloud
+## Deploy to Streamlit Community Cloud
 
 1. Push the application code and `requirements.txt` to a GitHub repository.
 2. Open [Streamlit Community Cloud](https://share.streamlit.io/) and connect the GitHub repository.
@@ -225,7 +228,7 @@ AI-Meeting-Assistant-Using-RAG/
     └── audio_processor.py        # Audio/video ingestion and processing
 ```
 
-## 🧯 Troubleshooting
+## Troubleshooting
 
 | Symptom | What to check |
 | --- | --- |
@@ -238,7 +241,7 @@ AI-Meeting-Assistant-Using-RAG/
 | RAG answers do not match the transcript | Check transcript quality, chunking/embedding configuration, retrieved context, and the question being asked. Treat the transcript as the source of truth. |
 
 
-## 🗺️ Future improvements
+## Future improvements
 
 - Add evaluation datasets and automated quality checks for summaries, extraction, and RAG answers.
 - Add source-linked answers with transcript timestamps or chunk references.
@@ -248,6 +251,6 @@ AI-Meeting-Assistant-Using-RAG/
 
 ---
 
-## 👤 Author
+## Author
 
 **Satyam Chaurasiya**
