@@ -1,2 +1,1 @@
-# System package required by pydub for audio/video probing and conversion.
 ffmpeg
