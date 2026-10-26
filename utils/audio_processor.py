@@ -223,6 +223,17 @@ def convert_to_wav(input_path: str) -> str:
     """
     Convert any audio/video file to mono 16 kHz WAV.
     """
+    # pydub is only a Python wrapper; it relies on the FFmpeg command-line
+    # tools (including ffprobe) being installed in the host environment.
+    missing_tools = [tool for tool in ("ffmpeg", "ffprobe") if not shutil.which(tool)]
+    if missing_tools:
+        missing = ", ".join(missing_tools)
+        raise RuntimeError(
+            f"Audio/video processing requires {missing}. Install the system "
+            "FFmpeg package and restart the app. On Streamlit Community Cloud, "
+            "add ffmpeg to packages.txt and redeploy."
+        )
+
     output_path = (os.path.splitext(input_path)[0] + "_converted.wav")
 
     print("Converting input file to WAV...")
