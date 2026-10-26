@@ -13,7 +13,7 @@ Provide a YouTube URL or upload an audio/video file. The application prepares th
 ## Application Screenshots
 
 ### Home Page
-![App Home Page](screenshots/home.png)
+![App Home Page]([screenshots/Screenshot%202026-09-13%20025702.png])
 
 ### Prediction Results
 ![Prediction Results](screenshots/prediction.png)
