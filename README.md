@@ -4,32 +4,19 @@
 
 An AI-powered meeting intelligence application that processes YouTube videos and uploaded audio/video files, transcribes speech, generates structured meeting insights, and lets users ask context-aware questions about the recording through Retrieval-Augmented Generation (RAG).
 
-<!-- Replace or remove these links if your repository or deployment URL changes. -->
-**Repository:** [satyam4312/AI-Meeting-Assistant-Using-RAG](https://github.com/satyam4312/AI-Meeting-Assistant-Using-RAG)
-
----
-
-## Contents
-
-- [Overview](#-overview)
-- [Features](#-features)
-- [Application workflow](#-application-workflow)
-- [Architecture](#-architecture)
-- [Technology stack](#-technology-stack)
-- [Getting started](#-getting-started)
-- [Configuration and API keys](#-configuration-and-api-keys)
-- [Run the application](#-run-the-application)
-- [Deploy to Streamlit Community Cloud](#-deploy-to-streamlit-community-cloud)
-- [Project structure](#-project-structure)
-- [Troubleshooting](#-troubleshooting)
-- [Privacy and limitations](#-privacy-and-limitations)
-- [Future improvements](#-future-improvements)
-
 ## 🚀 Overview
 
 Meetings and recorded discussions often contain decisions, commitments, deadlines, and unresolved questions that are difficult to find by replaying an entire recording. This project automates the process of converting recordings into structured notes and a conversational knowledge source.
 
 Provide a YouTube URL or upload an audio/video file. The application prepares the audio, transcribes speech, summarizes the discussion, extracts meeting details, and builds a retrieval pipeline so users can ask questions grounded in the transcript.
+
+## Application Screenshots
+
+### Home Page
+![App Home Page](screenshots/home.png)
+
+### Prediction Results
+![Prediction Results](screenshots/prediction.png)
 
 ## ✨ Features
 
@@ -218,8 +205,6 @@ ffmpeg
 
 Do **not** exclude `packages.txt` from Git if the deployment depends on it. The `.devcontainer/` directory is optional for Community Cloud deployment. You can choose the Python version in the deployment settings; a `.python-version` file is useful for some local tools but should not be relied upon as a substitute for selecting the deployment runtime.
 
-See the official [Streamlit dependency guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/app-dependencies) and [secrets guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management) for platform-specific details.
-
 ## 📁 Project structure
 
 The repository may include additional helper modules or configuration files; the main application components are organized around this structure:
@@ -252,14 +237,6 @@ AI-Meeting-Assistant-Using-RAG/
 | Processing a long recording takes a long time | Test with a shorter recording first. Transcription, model loading, LLM calls, and embedding generation can be resource-intensive. |
 | RAG answers do not match the transcript | Check transcript quality, chunking/embedding configuration, retrieved context, and the question being asked. Treat the transcript as the source of truth. |
 
-## 🔐 Privacy and limitations
-
-- API keys should be stored in local environment files or the deployment platform's secrets manager—not in source control.
-- Only process recordings you are authorized to use. Meeting transcripts may contain confidential or personal information.
-- The app depends on external services for some transcription and LLM workflows; review their applicable privacy policies and terms before processing sensitive material.
-- YouTube downloads can fail due to access restrictions, regional availability, authentication requirements, or changes to YouTube's delivery mechanisms. Uploading a media file is the fallback when you have the right to use it.
-- Model output quality depends on recording clarity, language, speaker overlap, transcript accuracy, and how explicitly owners, deadlines, and decisions are stated.
-- Local vector-store and generated-file persistence depends on the application's implementation and hosting environment. Do not assume generated files persist indefinitely on an ephemeral cloud instance.
 
 ## 🗺️ Future improvements
 
@@ -274,9 +251,3 @@ AI-Meeting-Assistant-Using-RAG/
 ## 👤 Author
 
 **Satyam Chaurasiya**
-
-- GitHub: [@satyam4312](https://github.com/satyam4312)
-
----
-
-If you find this project useful, consider giving the repository a ⭐ on GitHub.
