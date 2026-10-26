@@ -1,119 +1,282 @@
-# 🎥 AI Meeting/Video Assistant — RAG
+# 🎥 AI Meeting / Video Assistant — RAG
 
-> An AI-powered meeting intelligence system that transforms YouTube videos, audio, and video recordings into structured meeting insights and enables conversational Q&A over the meeting content using Retrieval-Augmented Generation (RAG).
+> Turn long meeting recordings into searchable, actionable knowledge.
+
+An AI-powered meeting intelligence application that processes YouTube videos and uploaded audio/video files, transcribes speech, generates structured meeting insights, and lets users ask context-aware questions about the recording through Retrieval-Augmented Generation (RAG).
+
+<!-- Replace or remove these links if your repository or deployment URL changes. -->
+**Repository:** [satyam4312/AI-Meeting-Assistant-Using-RAG](https://github.com/satyam4312/AI-Meeting-Assistant-Using-RAG)
 
 ---
+
+## Contents
+
+- [Overview](#-overview)
+- [Features](#-features)
+- [Application workflow](#-application-workflow)
+- [Architecture](#-architecture)
+- [Technology stack](#-technology-stack)
+- [Getting started](#-getting-started)
+- [Configuration and API keys](#-configuration-and-api-keys)
+- [Run the application](#-run-the-application)
+- [Deploy to Streamlit Community Cloud](#-deploy-to-streamlit-community-cloud)
+- [Project structure](#-project-structure)
+- [Troubleshooting](#-troubleshooting)
+- [Privacy and limitations](#-privacy-and-limitations)
+- [Future improvements](#-future-improvements)
 
 ## 🚀 Overview
 
-Meetings contain valuable information, but manually reviewing long recordings to find decisions, action items, deadlines, and unresolved questions is time-consuming.
+Meetings and recorded discussions often contain decisions, commitments, deadlines, and unresolved questions that are difficult to find by replaying an entire recording. This project automates the process of converting recordings into structured notes and a conversational knowledge source.
 
-**AI Meeting/Video Assistant** automates this entire workflow.
+Provide a YouTube URL or upload an audio/video file. The application prepares the audio, transcribes speech, summarizes the discussion, extracts meeting details, and builds a retrieval pipeline so users can ask questions grounded in the transcript.
 
-Simply provide a **YouTube URL or a local audio/video file**, and the system:
+## ✨ Features
 
-- 🎙️ Extracts and processes audio
-- 📝 Transcribes the meeting
-- 🌐 Supports English and Hindi/Hinglish workflows
-- 📌 Generates a structured meeting summary
-- ✅ Extracts actionable tasks with owners and deadlines
-- 🎯 Identifies key decisions
-- ❓ Finds unresolved questions and follow-ups
-- 💬 Allows users to chat with the meeting using RAG
-- 📄 Generates structured meeting reports
+### 🎬 Multiple input sources
 
-The goal is to turn unstructured meeting recordings into **searchable, actionable knowledge**.
+- Accepts YouTube URLs.
+- Supports uploaded audio and video files.
+- Extracts and converts audio for transcription using `yt-dlp`, FFmpeg, and audio-processing utilities.
+- Splits long recordings into manageable audio chunks.
+
+### 🎙️ Speech transcription
+
+| Input workflow | Technology |
+| --- | --- |
+| English audio | OpenAI Whisper |
+| Hindi / Hinglish workflow | Sarvam AI |
+
+The transcription workflow depends on the language selected and the configuration available to the application.
+
+### 🧠 Automated meeting intelligence
+
+- **Meeting summary:** produces a concise overview of the main discussion points.
+- **Action items:** identifies tasks and, when stated in the transcript, associated owners and deadlines.
+- **Key decisions:** extracts decisions reached during the discussion.
+- **Open questions:** surfaces unresolved questions and potential follow-ups.
+- **Meeting title:** generates a title to make the meeting easier to identify.
+- **Report export:** provides structured meeting-report output where supported by the application.
+
+### 💬 Conversational Q&A with RAG
+
+- Splits the transcript into retrievable text chunks.
+- Creates embeddings and stores them in ChromaDB.
+- Retrieves relevant transcript context for a user question.
+- Uses an LLM through LangChain and Groq to formulate a context-aware response.
+- Helps users locate information without manually searching the full transcript.
+
+### 🖥️ Interactive Streamlit interface
+
+Explore the meeting output through separate views for the summary, action items, decisions, questions, transcript, and chat-based Q&A.
+
+## 🔄 Application workflow
+
+1. **Input:** provide a YouTube URL or upload an audio/video file.
+2. **Audio preparation:** download/extract audio where possible, convert it to a compatible WAV format, and split long recordings into chunks.
+3. **Transcription:** generate transcript text using the selected speech-to-text workflow.
+4. **Meeting analysis:** create the summary and extract action items, decisions, and open questions.
+5. **Indexing:** split the transcript into chunks, generate embeddings, and index them in ChromaDB.
+6. **Question answering:** retrieve relevant transcript chunks and pass the context to the language model.
+7. **Results:** review the outputs and ask follow-up questions from the Streamlit interface.
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TD
+    A[YouTube URL or uploaded media] --> B[Audio extraction and conversion]
+    B --> C[Audio chunking]
+    C --> D{Transcription workflow}
+    D --> E[OpenAI Whisper]
+    D --> F[Sarvam AI]
+    E --> G[Transcript]
+    F --> G
+    G --> H[Summary and title generation]
+    G --> I[Action items, decisions, and questions]
+    G --> J[Chunking and embeddings]
+    J --> K[(ChromaDB vector store)]
+    L[User question] --> M[Retriever]
+    K --> M
+    M --> N[Relevant transcript context]
+    N --> O[Groq LLM via LangChain]
+    O --> P[Context-aware answer]
+    H --> Q[Streamlit interface]
+    I --> Q
+    G --> Q
+    P --> Q
+```
+
+## 🧰 Technology stack
+
+| Area | Technologies |
+| --- | --- |
+| Language and interface | Python, Streamlit |
+| Audio/video ingestion | `yt-dlp`, FFmpeg, `pydub` |
+| Speech-to-text | OpenAI Whisper, Sarvam AI |
+| LLM inference | Groq |
+| Orchestration | LangChain |
+| Embeddings | Sentence Transformers / Hugging Face |
+| Vector database | ChromaDB |
+| Configuration | `python-dotenv`, Streamlit secrets |
+| Deployment | Streamlit Community Cloud |
+
+## 🛠️ Getting started
+
+### Prerequisites
+
+- Python 3.11 (recommended for the project configuration described here).
+- Git.
+- FFmpeg installed and available on your `PATH`.
+- API keys for the services you plan to use: Groq and Sarvam AI.
+
+Check that FFmpeg is available:
+
+```bash
+ffmpeg -version
+```
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/satyam4312/AI-Meeting-Assistant-Using-RAG.git
+cd AI-Meeting-Assistant-Using-RAG
+```
+
+### 2. Create and activate a virtual environment
+
+**Windows PowerShell**
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+**macOS / Linux**
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+If FFmpeg is not installed on your machine, install it using the package manager appropriate for your operating system, then restart the terminal and re-run `ffmpeg -version`.
+
+### 4. Configure API keys
+
+Create a local `.env` file in the repository root:
+
+```env
+GROQ_API_KEY=your_groq_api_key
+SARVAM_API_KEY=your_sarvam_api_key
+```
+
+Replace the example values with your own keys. **Never commit `.env` or real API keys to GitHub.** The application code must load these values using its configured environment-variable or Streamlit-secrets mechanism.
+
+## ▶️ Run the application
+
+From the activated virtual environment and repository root, run:
+
+```bash
+streamlit run app.py
+```
+
+Open the local URL printed in the terminal, usually `http://localhost:8501`.
+
+For a first end-to-end test, upload a short audio/video file, check the transcript and extracted insights, then ask a question in the chat tab and verify that the answer is supported by the transcript.
+
+## ☁️ Deploy to Streamlit Community Cloud
+
+1. Push the application code and `requirements.txt` to a GitHub repository.
+2. Open [Streamlit Community Cloud](https://share.streamlit.io/) and connect the GitHub repository.
+3. Choose the `main` branch and set the main file path to `app.py`.
+4. In **Advanced settings**, select the Python version compatible with the project (Python 3.11 is the recommended target used in this README).
+5. Add required secrets in the app's **Secrets** settings.
+6. Deploy and review the application logs if the build or startup fails.
+
+Example secrets in TOML format:
+
+```toml
+GROQ_API_KEY = "your_groq_api_key"
+SARVAM_API_KEY = "your_sarvam_api_key"
+```
+
+Make sure the Python code reads Streamlit Cloud secrets with `st.secrets` or another mechanism supported by the app. Adding values to the Cloud Secrets panel does not make them available to code that only reads `os.getenv()` unless your application explicitly bridges that configuration.
+
+### External Linux dependencies
+
+The application uses FFmpeg for audio processing. Streamlit Community Cloud installs non-Python system packages from a root-level `packages.txt` file. If FFmpeg is required at runtime, keep this file committed and include:
+
+```text
+ffmpeg
+```
+
+Do **not** exclude `packages.txt` from Git if the deployment depends on it. The `.devcontainer/` directory is optional for Community Cloud deployment. You can choose the Python version in the deployment settings; a `.python-version` file is useful for some local tools but should not be relied upon as a substitute for selecting the deployment runtime.
+
+See the official [Streamlit dependency guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/app-dependencies) and [secrets guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management) for platform-specific details.
+
+## 📁 Project structure
+
+The repository may include additional helper modules or configuration files; the main application components are organized around this structure:
+
+```text
+AI-Meeting-Assistant-Using-RAG/
+├── app.py                       # Streamlit entry point
+├── main.py                      # Main processing workflow, if used separately
+├── requirements.txt             # Python dependencies
+├── packages.txt                 # Linux packages needed on Community Cloud, if required
+├── core/
+│   ├── transcriber.py            # Speech-to-text workflows
+│   ├── summarizer.py             # Meeting title and summary generation
+│   ├── extractor.py              # Action items, decisions, and questions
+│   ├── rag_engine.py              # Retrieval-augmented Q&A
+│   └── vector_store.py            # Vector store utilities, if present
+└── utils/
+    └── audio_processor.py        # Audio/video ingestion and processing
+```
+
+## 🧯 Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| `GROQ_API_KEY` or `SARVAM_API_KEY` missing | Confirm the key is set locally in `.env` or in Streamlit Cloud Secrets, and that the code reads from the matching source. |
+| `ffmpeg` not found | Install FFmpeg locally and ensure it is on `PATH`; on Community Cloud, commit a root-level `packages.txt` containing `ffmpeg`. |
+| YouTube download returns `403`, asks for sign-in, or fails to reload | YouTube may block automated downloads or restrict the video. Upload the permitted audio/video file instead. Not every YouTube URL is guaranteed to be downloadable. |
+| `ModuleNotFoundError` during deployment | Check that the package is listed in `requirements.txt`, that the package name is correct, and that the dependency file is in the repository root or app directory. |
+| Deployment fails while installing dependencies | Review the Cloud logs, confirm the selected Python version is compatible with all packages, and resolve dependency conflicts before redeploying. |
+| Processing a long recording takes a long time | Test with a shorter recording first. Transcription, model loading, LLM calls, and embedding generation can be resource-intensive. |
+| RAG answers do not match the transcript | Check transcript quality, chunking/embedding configuration, retrieved context, and the question being asked. Treat the transcript as the source of truth. |
+
+## 🔐 Privacy and limitations
+
+- API keys should be stored in local environment files or the deployment platform's secrets manager—not in source control.
+- Only process recordings you are authorized to use. Meeting transcripts may contain confidential or personal information.
+- The app depends on external services for some transcription and LLM workflows; review their applicable privacy policies and terms before processing sensitive material.
+- YouTube downloads can fail due to access restrictions, regional availability, authentication requirements, or changes to YouTube's delivery mechanisms. Uploading a media file is the fallback when you have the right to use it.
+- Model output quality depends on recording clarity, language, speaker overlap, transcript accuracy, and how explicitly owners, deadlines, and decisions are stated.
+- Local vector-store and generated-file persistence depends on the application's implementation and hosting environment. Do not assume generated files persist indefinitely on an ephemeral cloud instance.
+
+## 🗺️ Future improvements
+
+- Add evaluation datasets and automated quality checks for summaries, extraction, and RAG answers.
+- Add source-linked answers with transcript timestamps or chunk references.
+- Improve handling of diarization, noisy audio, and code-switching.
+- Add configurable chunk sizes, model selection, and processing status indicators.
+- Add durable storage and user-controlled deletion for meeting artifacts.
 
 ---
 
-## ✨ Key Features
+## 👤 Author
 
-### 🎬 Multi-Source Input
+**Satyam Chaurasiya**
 
-Accepts:
-
-- YouTube URLs
-- Local audio files
-- Local video files
-
-The audio processing pipeline automatically prepares the input for transcription.
+- GitHub: [@satyam4312](https://github.com/satyam4312)
 
 ---
 
-### 🎙️ AI-Powered Transcription
-
-The system supports different transcription workflows based on the selected language.
-
-| Language | Transcription |
-|----------|---------------|
-| English | OpenAI Whisper |
-| Hindi / Hinglish | Sarvam AI |
-
-This makes the system suitable for both English meetings and Indian multilingual conversations.
-
----
-
-### 🧠 Automated Meeting Intelligence
-
-Instead of producing only a raw transcript, the system extracts useful information from the meeting.
-
-#### 📋 Meeting Summary
-
-Generates concise bullet-point summaries covering the important topics discussed.
-
-#### ✅ Action Items
-
-Identifies:
-
-- Task
-- Responsible person
-- Deadline
-- Relevant context
-
-## Architecture
-
-                    ┌─────────────────────┐
-                    │   YouTube / File    │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │   Audio Processing  │
-                    │   & Extraction      │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │    Transcription    │
-                    │                     │
-                    │ Whisper / Sarvam AI │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │      Transcript     │
-                    └──────────┬──────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              │                │                │
-              ▼                ▼                ▼
-       ┌────────────┐   ┌────────────┐   ┌────────────┐
-       │  Summary   │   │  Meeting   │   │    RAG     │
-       │ Generation │   │ Extraction │   │  Pipeline  │
-       └────────────┘   └─────┬──────┘   └─────┬──────┘
-                              │                │
-                       ┌──────┼──────┐         │
-                       ▼      ▼      ▼         ▼
-                    Actions Decisions Questions
-                                               │
-                                               ▼
-                                      ┌────────────────┐
-                                      │ Vector Store   │
-                                      │   ChromaDB     │
-                                      └───────┬────────┘
-                                              │
-                                              ▼
-                                      ┌────────────────┐
-                                      │ Conversational │
-                                      │     RAG        │
-                                      └────────────────┘
+If you find this project useful, consider giving the repository a ⭐ on GitHub.
