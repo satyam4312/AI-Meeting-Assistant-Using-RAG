@@ -5,6 +5,17 @@ import streamlit as st
 from dotenv import load_dotenv
 load_dotenv(override = True)
 
+# Streamlit Community Cloud exposes configured keys through st.secrets rather
+# than automatically exporting them as environment variables.
+for secret_name in ("GROQ_API_KEY", "SARVAM_API_KEY"):
+    if not os.getenv(secret_name):
+        try:
+            secret_value = st.secrets.get(secret_name)
+        except Exception:
+            secret_value = None
+        if secret_value:
+            os.environ[secret_name] = str(secret_value)
+
 from utils.audio_processor import process_input, YouTubeDownloadError
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
@@ -140,6 +151,13 @@ with st.container(border = True):
     process_button = st.button("🚀 Process Meeting", type = "primary", use_container_width = True)
 
 if process_button:
+    if not os.getenv("GROQ_API_KEY"):
+        st.error(
+            "GROQ_API_KEY is missing. Add it in Streamlit Cloud under "
+            "App settings → Secrets, then restart the app."
+        )
+        st.stop()
+
     source = None
 
     if youtube_url.strip():
