@@ -228,19 +228,6 @@ AI-Meeting-Assistant-Using-RAG/
     └── audio_processor.py        # Audio/video ingestion and processing
 ```
 
-## Troubleshooting
-
-| Symptom | What to check |
-| --- | --- |
-| `GROQ_API_KEY` or `SARVAM_API_KEY` missing | Confirm the key is set locally in `.env` or in Streamlit Cloud Secrets, and that the code reads from the matching source. |
-| `ffmpeg` not found | Install FFmpeg locally and ensure it is on `PATH`; on Community Cloud, commit a root-level `packages.txt` containing `ffmpeg`. |
-| YouTube download returns `403`, asks for sign-in, or fails to reload | YouTube may block automated downloads or restrict the video. Upload the permitted audio/video file instead. Not every YouTube URL is guaranteed to be downloadable. |
-| `ModuleNotFoundError` during deployment | Check that the package is listed in `requirements.txt`, that the package name is correct, and that the dependency file is in the repository root or app directory. |
-| Deployment fails while installing dependencies | Review the Cloud logs, confirm the selected Python version is compatible with all packages, and resolve dependency conflicts before redeploying. |
-| Processing a long recording takes a long time | Test with a shorter recording first. Transcription, model loading, LLM calls, and embedding generation can be resource-intensive. |
-| RAG answers do not match the transcript | Check transcript quality, chunking/embedding configuration, retrieved context, and the question being asked. Treat the transcript as the source of truth. |
-
-
 ## Future improvements
 
 - Add evaluation datasets and automated quality checks for summaries, extraction, and RAG answers.
