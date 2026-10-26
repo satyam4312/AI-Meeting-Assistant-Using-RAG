@@ -1,4 +1,5 @@
 import os
+import importlib
 import shutil
 import subprocess
 from pathlib import Path
@@ -223,8 +224,30 @@ def convert_to_wav(input_path: str) -> str:
     """
     Convert any audio/video file to mono 16 kHz WAV.
     """
-    # pydub is only a Python wrapper; it relies on the FFmpeg command-line
-    # tools (including ffprobe) being installed in the host environment.
+    # pydub is only a Python wrapper. Prefer the host's FFmpeg installation,
+    # but fetch static binaries when the host (for example Streamlit Cloud)
+    # hasn't installed them from packages.txt.
+    missing_tools = [tool for tool in ("ffmpeg", "ffprobe") if not shutil.which(tool)]
+    if missing_tools:
+        try:
+            static_ffmpeg_run = importlib.import_module("static_ffmpeg").run
+            ffmpeg_path, ffprobe_path = (
+                static_ffmpeg_run.get_or_fetch_platform_executables_else_raise()
+            )
+            binary_dir = str(Path(ffmpeg_path).parent)
+            os.environ["PATH"] = binary_dir + os.pathsep + os.environ.get("PATH", "")
+            # pydub caches the ffmpeg executable name at import time.
+            AudioSegment.converter = ffmpeg_path
+            # Ensure probing resolves to the paired binary as well.
+            import pydub.utils
+            pydub.utils.get_prober_name = lambda: ffprobe_path
+        except Exception as e:
+            raise RuntimeError(
+                "Audio/video processing needs ffmpeg and ffprobe. The host "
+                "does not provide them and the bundled FFmpeg fallback could "
+                f"not be prepared: {e}"
+            ) from e
+
     missing_tools = [tool for tool in ("ffmpeg", "ffprobe") if not shutil.which(tool)]
     if missing_tools:
         missing = ", ".join(missing_tools)

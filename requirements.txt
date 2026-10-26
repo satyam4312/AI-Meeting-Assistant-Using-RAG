@@ -5,6 +5,7 @@
 yt-dlp[default]>=2025.05.22       # Download audio from YouTube URLs
 pydub>=0.25.1                     # Audio file manipulation / format conversion
 ffmpeg-python>=0.2.0              # FFmpeg bindings (FFmpeg binary must be installed separately)
+static-ffmpeg>=3.0,<4.0           # Bundled ffmpeg/ffprobe fallback for hosted environments
 
 bgutil-ytdlp-pot-provider>=2.0.0
 deno>=2.9.0

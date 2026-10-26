@@ -155,4 +155,5 @@ settings.local.*
 
 *.python-version
 *packages.txt
+!packages.txt
 *.devcontainer 
