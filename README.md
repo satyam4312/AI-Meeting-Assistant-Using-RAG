@@ -241,3 +241,6 @@ AI-Meeting-Assistant-Using-RAG/
 ## Author
 
 **Satyam Chaurasiya**
+## License
+
+This project is licensed under the [MIT License](LICENSE).
