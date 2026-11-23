@@ -1,4 +1,4 @@
-# 🎥 AI Meeting / Video Assistant — RAG
+# 🎥 AI Meeting / Video Assistant — RAG based meeting intelligence 
 
 > Turn long meeting recordings into searchable, actionable knowledge.
 
@@ -175,38 +175,9 @@ From the activated virtual environment and repository root, run:
 ```bash
 streamlit run app.py
 ```
-
 Open the local URL printed in the terminal, usually `http://localhost:8501`.
-
 For a first end-to-end test, upload a short audio/video file, check the transcript and extracted insights, then ask a question in the chat tab and verify that the answer is supported by the transcript.
 
-## Deploy to Streamlit Community Cloud
-
-1. Push the application code and `requirements.txt` to a GitHub repository.
-2. Open [Streamlit Community Cloud](https://share.streamlit.io/) and connect the GitHub repository.
-3. Choose the `main` branch and set the main file path to `app.py`.
-4. In **Advanced settings**, select the Python version compatible with the project (Python 3.11 is the recommended target used in this README).
-5. Add required secrets in the app's **Secrets** settings.
-6. Deploy and review the application logs if the build or startup fails.
-
-Example secrets in TOML format:
-
-```toml
-GROQ_API_KEY = "your_groq_api_key"
-SARVAM_API_KEY = "your_sarvam_api_key"
-```
-
-Make sure the Python code reads Streamlit Cloud secrets with `st.secrets` or another mechanism supported by the app. Adding values to the Cloud Secrets panel does not make them available to code that only reads `os.getenv()` unless your application explicitly bridges that configuration.
-
-### External Linux dependencies
-
-The application uses FFmpeg for audio processing. Streamlit Community Cloud installs non-Python system packages from a root-level `packages.txt` file. If FFmpeg is required at runtime, keep this file committed and include:
-
-```text
-ffmpeg
-```
-
-Do **not** exclude `packages.txt` from Git if the deployment depends on it. The `.devcontainer/` directory is optional for Community Cloud deployment. You can choose the Python version in the deployment settings; a `.python-version` file is useful for some local tools but should not be relied upon as a substitute for selecting the deployment runtime.
 
 ## 📁 Project structure
 
@@ -237,10 +208,6 @@ AI-Meeting-Assistant-Using-RAG/
 - Add durable storage and user-controlled deletion for meeting artifacts.
 
 ---
-
-## Author
-
-**Satyam Chaurasiya**
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
