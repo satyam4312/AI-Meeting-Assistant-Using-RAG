@@ -119,11 +119,6 @@ flowchart TD
 - FFmpeg installed and available on your `PATH`.
 - API keys for the services you plan to use: Groq and Sarvam AI.
 
-Check that FFmpeg is available:
-
-```bash
-ffmpeg -version
-```
 
 ### 1. Clone the repository
 
