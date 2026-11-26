@@ -121,9 +121,9 @@ with st.container(border=True):
         youtube_url = st.text_input("YouTube URL", placeholder="https://www.youtube.com/watch?v=...", label_visibility="collapsed")
     with source_tab_upload:
         uploaded_file = st.file_uploader(
-            "Choose an audio or video file",
-            type=["mp4", "mov", "mkv", "avi", "webm", "mp3", "wav", "m4a", "aac", "flac", "ogg"],
             label="Recording file",
+            type=["mp4", "mov", "mkv", "avi", "webm", "mp3", "wav", "m4a", "aac", "flac", "ogg"],
+            help="Choose an audio or video file.",
         )
     st.write("")
     process_button = st.button("Create meeting brief", type="primary", use_container_width=True)
