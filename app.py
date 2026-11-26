@@ -26,42 +26,49 @@ from core.rag_engine import build_rag_chain, ask_question
 
 st.set_page_config(
     page_title = "AI Video Meeting Assistant",
-    page_icon = "✳️",
+    page_icon = "🎬",
     layout = "wide",
-    initial_sidebar_state = "collapsed",
+    initial_sidebar_state = "expanded",
 )
 
 st.markdown(
     """
     <style>
-        :root { --ink: #18332f; --muted: #71817d; --line: #e4e9e5; }
-        [data-testid="stAppViewContainer"] { background: #f5f7f3; }
-        [data-testid="stHeader"] { background: transparent; }
-        .block-container { max-width: 1160px; padding: 2.25rem 2rem 4rem; }
-        h1, h2, h3 { color: var(--ink); letter-spacing: -.035em; }
-        p, label, .stCaption { color: #52635f; }
-        .hero { position:relative; overflow:hidden; color:#f8fbf5; padding:2.2rem 2.5rem; margin:0 0 1.4rem; border:1px solid rgba(255,255,255,.1); border-radius:24px; background:radial-gradient(circle at 88% 5%, rgba(197,239,120,.25), transparent 26%), linear-gradient(120deg,#163632 0%,#244b43 58%,#315d50 100%); box-shadow:0 18px 45px rgba(25,55,48,.13); }
-        .hero-kicker { color:#c5ef78; font-size:.72rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
-        .hero h1 { color:#fff; font-size:clamp(2rem,4vw,3.15rem); line-height:1.08; margin:.55rem 0 .65rem; }
-        .hero p { color:#d2e1d9; max-width:610px; font-size:1.02rem; margin:0; }
-        .hero-steps { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:1.45rem; }
-        .hero-steps span { color:#eaf2e9; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.07); border-radius:999px; padding:.36rem .75rem; font-size:.79rem; }
-        [data-testid="stVerticalBlockBorderWrapper"] { background:#fff; border:1px solid var(--line); border-radius:18px; box-shadow:0 6px 20px rgba(30,55,46,.035); }
-        [data-testid="stMetric"] { background:#fff; border:1px solid var(--line); border-radius:16px; padding:1rem 1.15rem; }
-        [data-testid="stMetricLabel"] { color:var(--muted); font-weight:650; }
-        [data-testid="stMetricValue"] { color:var(--ink); font-weight:780; }
-        [data-testid="stTabs"] [data-baseweb="tab-list"] { gap:.45rem; border-bottom:1px solid var(--line); }
-        [data-testid="stTabs"] button[data-baseweb="tab"] { color:#657570; font-weight:650; border-radius:10px 10px 0 0; }
-        [data-testid="stTabs"] button[aria-selected="true"] { color:var(--ink); }
-        div.stButton > button[kind="primary"] { background:#244b43; color:#fff; border:0; border-radius:12px; min-height:3rem; font-weight:750; box-shadow:0 7px 18px rgba(36,75,67,.18); }
-        div.stButton > button[kind="primary"]:hover { background:#183c35; color:#fff; border:0; }
-        [data-testid="stFileUploader"] section { background:#f8faf7; border:1px dashed #bccac1; border-radius:14px; }
-        [data-testid="stChatMessage"] { border:1px solid var(--line); border-radius:16px; }
-        [data-testid="stTextArea"] textarea { border-radius:12px; background:#fbfcfa; line-height:1.65; }
-        .eyebrow { color:#7c8b85; font-size:.72rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
-        .report-title { color:#18332f; font-size:clamp(1.65rem,3vw,2.25rem); font-weight:800; line-height:1.15; letter-spacing:-.04em; margin:.35rem 0 .45rem; }
-        .report-subtitle { color:#71817d; margin:0; }
-        @media (max-width:700px) { .block-container { padding:1.2rem 1rem 3rem; } .hero { padding:1.6rem 1.35rem; border-radius:19px; } }
+        :root { --ink:#f3f2f8; --muted:#9b9ca8; --line:#2d303a; --accent:#ff4d57; }
+        [data-testid="stAppViewContainer"] { background:#0c0d12; color:var(--ink); }
+        [data-testid="stHeader"] { background:#0c0d12; }
+        [data-testid="stSidebar"] { background:#23252e; border-right:1px solid #343641; }
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap:.65rem; }
+        [data-testid="stSidebar"] label, [data-testid="stSidebar"] p, [data-testid="stSidebar"] .stMarkdown { color:#d8d8e0; }
+        .block-container { max-width:1480px; padding:1.35rem clamp(1.25rem,4vw,3.6rem) 3.5rem; }
+        h1, h2, h3, h4 { color:var(--ink); letter-spacing:-.035em; }
+        p, .stCaption { color:#a5a6b2; }
+        [data-testid="stSidebar"] input, [data-testid="stSidebar"] [data-baseweb="select"] > div { background:#11131a; border-color:#383a45; color:#f3f2f8; border-radius:10px; }
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] section { background:#1a1c24; border:1px dashed #555762; border-radius:12px; }
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] small, [data-testid="stSidebar"] [data-testid="stFileUploader"] span { color:#b5b5c0; }
+        .side-brand { color:#f7f6fb; font-size:1.05rem; font-weight:760; letter-spacing:-.02em; }
+        .side-brand span { display:inline-grid; place-items:center; width:30px; height:30px; margin-right:.5rem; border-radius:9px; background:#393746; }
+        .side-tagline { color:#a1a2ad; font-size:.85rem; margin-top:.35rem; }
+        .app-heading { margin:0; color:#f4f2fa; font-size:clamp(2rem,3vw,2.65rem); line-height:1.12; font-weight:780; letter-spacing:-.045em; }
+        .app-subtitle { margin:.55rem 0 2.35rem; color:#a6a7b5; font-size:1rem; }
+        .report-title { color:#f4f2fa; font-size:clamp(1.55rem,2.4vw,2rem); font-weight:770; line-height:1.2; letter-spacing:-.035em; margin:.25rem 0 1.15rem; }
+        [data-testid="stMetric"] { min-height:100px; background:#14161d; border:1px solid #292c36; border-radius:13px; padding:1rem 1.1rem; }
+        [data-testid="stMetricLabel"] { color:#c2c2cc; font-weight:550; font-size:.88rem; }
+        [data-testid="stMetricValue"] { color:#f5f4f9; font-weight:650; font-size:clamp(1.7rem,2.4vw,2.5rem); }
+        [data-testid="stTabs"] [data-baseweb="tab-list"] { gap:.7rem; border-bottom:1px solid #333640; margin-top:1.8rem; }
+        [data-testid="stTabs"] button[data-baseweb="tab"] { color:#c6c6cf; font-weight:600; }
+        [data-testid="stTabs"] button[aria-selected="true"] { color:#ff6670; }
+        [data-testid="stTabs"] [data-baseweb="tab-highlight"] { background:#ff4d57; height:2px; }
+        div.stButton > button[kind="primary"] { background:#ff4d57; color:white; border:0; border-radius:10px; min-height:2.8rem; font-weight:680; }
+        div.stButton > button[kind="primary"]:hover { background:#e83e49; color:#fff; border:0; }
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"] { background:#ff4d57; }
+        [data-testid="stSidebar"] div.stButton > button:not([kind="primary"]) { background:transparent; color:#f1f0f5; border:1px solid #50525d; border-radius:10px; min-height:2.65rem; }
+        [data-testid="stVerticalBlockBorderWrapper"] { background:#14161d; border:1px solid #292c36; border-radius:14px; }
+        [data-testid="stChatMessage"] { background:#14161d; border:1px solid #292c36; border-radius:13px; }
+        [data-testid="stTextArea"] textarea { border-radius:10px; background:#11131a; color:#f3f2f8; line-height:1.65; }
+        .eyebrow { color:#a8a9b5; font-size:.72rem; font-weight:700; letter-spacing:.11em; text-transform:uppercase; }
+        .report-subtitle { color:#a4a5b1; margin:0; }
+        @media (max-width:850px) { .block-container { padding:1.3rem 1.15rem 3rem; } [data-testid="stTabs"] [data-baseweb="tab-list"] { gap:.15rem; } [data-testid="stTabs"] button[data-baseweb="tab"] { padding-left:.55rem; padding-right:.55rem; font-size:.82rem; } }
     </style>
     """,
     unsafe_allow_html = True,
@@ -95,39 +102,49 @@ for key, value in defaults.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
+st.sidebar.markdown(
+    '<div class="side-brand"><span>🎬</span> AI Video Assistant</div>'
+    '<div class="side-tagline">Meeting intelligence, end to end.</div>',
+    unsafe_allow_html=True,
+)
+st.sidebar.markdown("---")
+st.sidebar.markdown("**YouTube URL or file**")
+youtube_url = st.sidebar.text_input(
+    "YouTube URL",
+    placeholder="Paste a YouTube link...",
+    label_visibility="collapsed",
+    key="youtube_url_input",
+)
+uploaded_file = st.sidebar.file_uploader(
+    label="Upload meeting audio/video",
+    type=["mp4", "mov", "mkv", "avi", "webm", "mp3", "wav", "m4a", "aac", "flac", "ogg"],
+    help="Choose an audio or video file.",
+    key="meeting_file_input",
+)
+language = st.sidebar.selectbox(
+    "Language",
+    options=["English", "Hinglish"],
+    index=0,
+    help="Hinglish uses Sarvam AI; English uses Whisper.",
+)
+process_button = st.sidebar.button("⚡  Analyse meeting", type="primary", use_container_width=True)
+st.sidebar.markdown("---")
+if st.sidebar.button("📁  New session", use_container_width=True):
+    st.session_state.clear()
+    st.rerun()
+
 st.markdown(
-    """
-    <div class="hero">
-        <div class="hero-kicker">Meeting intelligence, made simple</div>
-        <h1>Make every meeting<br>easier to remember.</h1>
-        <p>Turn a recording into clear notes, decisions, action items, and answers you can find later.</p>
-        <div class="hero-steps">
-            <span>01 &nbsp; Transcribe</span><span>02 &nbsp; Summarize</span>
-            <span>03 &nbsp; Find next steps</span><span>04 &nbsp; Ask anything</span>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html = True,
+    '<h1 class="app-heading">AI Video Assistant</h1>'
+    '<p class="app-subtitle">Transcribe · Summarise · Chat with your meetings</p>',
+    unsafe_allow_html=True,
 )
 
-with st.container(border=True):
-    st.markdown('<div class="eyebrow">Start with a recording</div>', unsafe_allow_html=True)
-    st.subheader("Bring your meeting in")
-    st.caption("Paste a YouTube link or choose an audio/video file. We’ll turn it into a searchable meeting brief.")
-    youtube_url = ""
-    uploaded_file = None
-    source_tab_url, source_tab_upload = st.tabs(["YouTube link", "Upload a file"])
-    with source_tab_url:
-        youtube_url = st.text_input("YouTube URL", placeholder="https://www.youtube.com/watch?v=...", label_visibility="collapsed")
-    with source_tab_upload:
-        uploaded_file = st.file_uploader(
-            label="Recording file",
-            type=["mp4", "mov", "mkv", "avi", "webm", "mp3", "wav", "m4a", "aac", "flac", "ogg"],
-            help="Choose an audio or video file.",
-        )
-    st.write("")
-    process_button = st.button("Create meeting brief", type="primary", use_container_width=True)
-    st.caption("Your transcript, summary, and action items will appear here after processing.")
+if not st.session_state.processed:
+    with st.container(border=True):
+        st.markdown('<div class="eyebrow">Your workspace</div>', unsafe_allow_html=True)
+        st.subheader("Your meeting brief will appear here")
+        st.caption("Add a YouTube link or upload a recording from the sidebar to get started.")
+        st.markdown("**Transcript**  ·  **Summary**  ·  **Action items**  ·  **Decisions**  ·  **Meeting chat**")
 
 if process_button:
     if not os.getenv("GROQ_API_KEY"):
@@ -182,7 +199,7 @@ if process_button:
     try:
         with st.status("🎙️ Transcribing meeting...", expanded=True) as status:
             st.write("Running speech-to-text...")
-            transcript = transcribe_all(chunks)
+            transcript = transcribe_all(chunks, language=language.lower())
             if not transcript:
                 st.error("No transcript was generated.")
                 st.stop()
